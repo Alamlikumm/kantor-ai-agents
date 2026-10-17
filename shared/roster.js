@@ -94,7 +94,7 @@ export const AGENTS = [
   A('kirana', 'reporting', 'Kirana Dewanti', 'F', 'Reporting Analyst', 'laporan bulanan, insight GA4 dan Ads, narasi data',
     { skin: 1, hair: '#2b1d16', style: 'long', glasses: true },
     ['Ringkas data ini jadi laporan klien', 'Template laporan bulanan', 'Jelaskan penurunan traffic dengan bahasa awam']),
-  A('rizky', 'account', 'Rizky Ramadhan', 'M', 'Account Manager', 'komunikasi klien, update progres, revisi, deadline',
+  A('ridho', 'account', 'Achmad Darussalam Ridho', 'M', 'Account Manager', 'komunikasi klien, update progres, revisi, deadline',
     { skin: 2, hair: '#1c1c1c', style: 'short' },
     ['Draft update progres ke client', 'Balas client yang minta revisi terus', 'Follow-up client belum approve desain']),
   A('melati', 'finance', 'Melati Handayani', 'F', 'Finance & Admin', 'invoice, termin, reminder tagihan, rekap',
