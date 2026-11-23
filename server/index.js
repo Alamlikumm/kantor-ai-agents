@@ -38,6 +38,39 @@ pgPool.on('error', (err) => {
   console.error('[pg pool error]', err.message);
 });
 
+async function initDatabase() {
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS social_posts (
+        id SERIAL PRIMARY KEY,
+        topic VARCHAR(255),
+        platform VARCHAR(100),
+        draft_nadia TEXT,
+        review_dewi TEXT,
+        final_content TEXT,
+        post_url TEXT,
+        status VARCHAR(50) DEFAULT 'PENDING_APPROVAL',
+        created_at TIMESTAMP DEFAULT NOW(),
+        approved_at TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS sales_inquiries (
+        id SERIAL PRIMARY KEY,
+        customer_name VARCHAR(255),
+        customer_phone VARCHAR(100),
+        inquiry_text TEXT,
+        product_name VARCHAR(255),
+        quote_draft TEXT,
+        status VARCHAR(50) DEFAULT 'DRAFT',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('[db] PostgreSQL siap (tabel social_posts & sales_inquiries berhasil dimuat).');
+  } catch (err) {
+    console.warn('[db init warning] PostgreSQL belum siap, fallback ke penyimpanan lokal aktif:', err.message);
+  }
+}
+initDatabase();
+
 // Prioritaskan 9router (OpenAI-compatible), fallback ke Anthropic SDK jika ada key Anthropic
 const openaiClient = ROUTER_API_KEY
   ? new OpenAI({ baseURL: ROUTER_BASE_URL, apiKey: ROUTER_API_KEY })
@@ -310,6 +343,25 @@ function persistTasks() {
     writeFileSync(TASKS_FILE, JSON.stringify(interAgentTasks.slice(0, 100), null, 2), 'utf8');
   } catch (e) {
     console.error('[persist-tasks-error]', e.message);
+  }
+}
+
+// Penyimpanan lokal draf postingan sosial media (Fallback jika PostgreSQL offline/error)
+const POSTS_FILE = fileURLToPath(new URL('./social_posts.json', import.meta.url));
+let localPosts = [];
+try {
+  if (existsSync(POSTS_FILE)) {
+    localPosts = JSON.parse(readFileSync(POSTS_FILE, 'utf8')) || [];
+  }
+} catch {
+  localPosts = [];
+}
+
+function persistLocalPosts() {
+  try {
+    writeFileSync(POSTS_FILE, JSON.stringify(localPosts.slice(0, 100), null, 2), 'utf8');
+  } catch (e) {
+    console.error('[persist-posts-error]', e.message);
   }
 }
 
@@ -601,7 +653,7 @@ Tugasmu sebagai Planner:
 
     const leaderReview = await generateAgentReply(patrick, patrickPrompt);
 
-    // Step 3: Simpan otomatis ke database PostgreSQL kantor_ai
+    // Step 3: Simpan otomatis ke database PostgreSQL kantor_ai (dengan Fallback Aman ke localPosts)
     let postId = null;
     try {
       const insertRes = await pgPool.query(
@@ -612,32 +664,54 @@ Tugasmu sebagai Planner:
       );
       postId = insertRes.rows[0]?.id;
       console.log(`[db] Post #${postId} tersimpan di PostgreSQL kantor_ai`);
-
-      // Otomatis Render Video Gratis via FFmpeg di Background
-      if (postId) {
-        (async () => {
-          try {
-            const hookMatch = draft.match(/Hook[^:]*:\s*([^\n\r]+)/i) || draft.match(/^([^\n\r]+)/);
-            const hookText = hookMatch ? hookMatch[1].trim() : topic;
-            const renderRes = await renderAutomatedVideo({
-              postId,
-              topic,
-              hook: hookText,
-              script: draft,
-              duration: 10,
-            });
-            if (renderRes.success && renderRes.videoUrl) {
-              await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [renderRes.videoUrl, postId]);
-              broadcastEvent('video_rendered', { postId, videoUrl: renderRes.videoUrl });
-            }
-          } catch (vErr) {
-            console.error('[auto-render-error]', vErr.message);
-          }
-        })();
-      }
     } catch (dbErr) {
-      console.error('[db insert error]', dbErr.message);
+      console.warn('[db insert fallback]', dbErr.message);
     }
+
+    if (!postId) {
+      postId = Date.now();
+      console.log(`[local-db] Post #${postId} disimpan ke penyimpanan lokal JSON (fallback)`);
+    }
+
+    const postRecord = {
+      id: postId,
+      topic,
+      platform,
+      draft_nadia: draft,
+      review_dewi: leaderReview,
+      final_content: leaderReview,
+      post_url: null,
+      status: 'PENDING_APPROVAL',
+      created_at: new Date().toISOString(),
+    };
+    localPosts.unshift(postRecord);
+    persistLocalPosts();
+
+    // Step 4: Otomatis Render Video Gratis via FFmpeg di Background
+    (async () => {
+      try {
+        const hookMatch = draft.match(/Hook[^:]*:\s*([^\n\r]+)/i) || draft.match(/^([^\n\r]+)/);
+        const hookText = hookMatch ? hookMatch[1].trim() : topic;
+        const renderRes = await renderAutomatedVideo({
+          postId,
+          topic,
+          hook: hookText,
+          script: draft,
+          duration: 10,
+        });
+        if (renderRes.success && renderRes.videoUrl) {
+          try {
+            await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [renderRes.videoUrl, postId]);
+          } catch {}
+          postRecord.post_url = renderRes.videoUrl;
+          persistLocalPosts();
+          broadcastEvent('video_rendered', { postId, videoUrl: renderRes.videoUrl });
+          console.log(`[video-rendered] Video selesai & ditautkan ke Post #${postId}: ${renderRes.videoUrl}`);
+        }
+      } catch (vErr) {
+        console.error('[auto-render-error]', vErr.message);
+      }
+    })();
 
     res.json({
       success: true,
@@ -666,25 +740,37 @@ app.post('/api/pipeline/approve', requireAccess, async (req, res) => {
       return res.status(400).json({ success: false, error: 'postId wajib diisi.' });
     }
 
-    const updateRes = await pgPool.query(
-      `UPDATE social_posts 
-       SET status = 'APPROVED', approved_at = NOW() 
-       WHERE id = $1 AND status = 'PENDING_APPROVAL' 
-       RETURNING id, topic, platform, final_content, status`,
-      [Number(postId)]
-    );
+    let updatedPost = null;
+    try {
+      const updateRes = await pgPool.query(
+        `UPDATE social_posts 
+         SET status = 'APPROVED', approved_at = NOW() 
+         WHERE id = $1 AND status = 'PENDING_APPROVAL' 
+         RETURNING id, topic, platform, post_url, final_content, status`,
+        [Number(postId)]
+      );
+      if (updateRes.rows.length) updatedPost = updateRes.rows[0];
+    } catch {}
 
-    if (!updateRes.rows.length) {
+    const local = localPosts.find((p) => Number(p.id) === Number(postId));
+    if (local) {
+      local.status = 'APPROVED';
+      local.approved_at = new Date().toISOString();
+      persistLocalPosts();
+      if (!updatedPost) updatedPost = local;
+    }
+
+    if (!updatedPost) {
       return res.status(404).json({
         success: false,
-        error: `Post #${postId} tidak ditemukan atau statusnya bukan PENDING_APPROVAL.`,
+        error: `Post #${postId} tidak ditemukan di database.`,
       });
     }
 
     res.json({
       success: true,
       message: `Post #${postId} berhasil di-approve! Siap diposting.`,
-      post: updateRes.rows[0],
+      post: updatedPost,
     });
   } catch (err) {
     console.error('[approve error]', err);
@@ -700,15 +786,26 @@ app.post('/api/pipeline/attach-video', requireAccess, async (req, res) => {
       return res.status(400).json({ success: false, error: 'postId dan videoUrl wajib diisi.' });
     }
 
-    const updateRes = await pgPool.query(
-      `UPDATE social_posts 
-       SET post_url = $1 
-       WHERE id = $2 
-       RETURNING id, topic, platform, post_url, status`,
-      [String(videoUrl).trim(), Number(postId)]
-    );
+    let updatedPost = null;
+    try {
+      const updateRes = await pgPool.query(
+        `UPDATE social_posts 
+         SET post_url = $1 
+         WHERE id = $2 
+         RETURNING id, topic, platform, post_url, status`,
+        [String(videoUrl).trim(), Number(postId)]
+      );
+      if (updateRes.rows.length) updatedPost = updateRes.rows[0];
+    } catch {}
 
-    if (!updateRes.rows.length) {
+    const local = localPosts.find((p) => Number(p.id) === Number(postId));
+    if (local) {
+      local.post_url = String(videoUrl).trim();
+      persistLocalPosts();
+      if (!updatedPost) updatedPost = local;
+    }
+
+    if (!updatedPost) {
       return res.status(404).json({
         success: false,
         error: `Post #${postId} tidak ditemukan di database.`,
@@ -724,7 +821,7 @@ app.post('/api/pipeline/attach-video', requireAccess, async (req, res) => {
     res.json({
       success: true,
       message: `Video untuk Post #${postId} berhasil ditautkan!`,
-      post: updateRes.rows[0],
+      post: updatedPost,
     });
   } catch (err) {
     console.error('[attach video error]', err);
@@ -962,9 +1059,16 @@ app.get('/api/pipeline/post/:id', async (req, res) => {
   try {
     const postId = Number(req.params.id);
     if (!postId) return res.status(400).json({ success: false, error: 'ID tidak valid.' });
-    const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [postId]);
-    if (!r.rows.length) return res.status(404).json({ success: false, error: 'Post tidak ditemukan.' });
-    res.json({ success: true, post: r.rows[0] });
+
+    try {
+      const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [postId]);
+      if (r.rows.length) return res.json({ success: true, post: r.rows[0] });
+    } catch {}
+
+    const local = localPosts.find((p) => Number(p.id) === postId);
+    if (local) return res.json({ success: true, post: local });
+
+    res.status(404).json({ success: false, error: 'Post tidak ditemukan.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -973,13 +1077,18 @@ app.get('/api/pipeline/post/:id', async (req, res) => {
 // Endpoint Ambil Daftar Konten Pending Approval untuk Meja Agnes
 app.get('/api/pipeline/pending', async (req, res) => {
   try {
-    const r = await pgPool.query(
-      `SELECT id, topic, platform, post_url, status, draft_nadia, review_dewi, created_at 
-       FROM social_posts 
-       WHERE status = 'PENDING_APPROVAL' 
-       ORDER BY id DESC LIMIT 10`
-    );
-    res.json({ success: true, posts: r.rows });
+    try {
+      const r = await pgPool.query(
+        `SELECT id, topic, platform, post_url, status, draft_nadia, review_dewi, created_at 
+         FROM social_posts 
+         WHERE status = 'PENDING_APPROVAL' 
+         ORDER BY id DESC LIMIT 10`
+      );
+      if (r.rows.length) return res.json({ success: true, posts: r.rows });
+    } catch {}
+
+    const pending = localPosts.filter((p) => p.status === 'PENDING_APPROVAL');
+    res.json({ success: true, posts: pending.slice(0, 10) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

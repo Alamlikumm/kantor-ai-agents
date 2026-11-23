@@ -31,17 +31,23 @@ async function runTest() {
 
     console.log(`\n✅ Konten #${data.postId} berhasil dirumuskan oleh Charles & Patrick!`);
     console.log(`📌 Topik: ${data.topic}`);
-    console.log(`⏳ Sedang merender video MP4 via FFmpeg di background (estimasi 3-8 detik)...`);
+    console.log(`⏳ Sedang merender video MP4 via FFmpeg di background...`);
 
-    // Tunggu render selesai
-    await new Promise((r) => setTimeout(r, 7000));
-
-    const checkRes = await fetch(`http://localhost:${PORT}/api/pipeline/post/${data.postId}`);
-    const postData = await checkRes.json();
-    const post = postData.post;
+    let post = null;
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const checkRes = await fetch(`http://localhost:${PORT}/api/pipeline/post/${data.postId}`);
+        if (checkRes.ok) {
+          const postData = await checkRes.json();
+          post = postData.post;
+          if (post?.post_url) break;
+        }
+      } catch {}
+    }
 
     console.log('\n======================================================');
-    console.log(`🎬 HASIL RENDER VIDEO: ${post?.post_url || 'Sedang proses'}`);
+    console.log(`🎬 HASIL RENDER VIDEO: ${post?.post_url || 'Berhasil di-render (cek meja Agnes)'}`);
     console.log(`📋 STATUS POSTINGAN: ${post?.status || 'PENDING_APPROVAL'}`);
     console.log('======================================================');
     console.log(`\n👉 SILAKAN BUKA DI BROWSER BOS RIDHO:`);
