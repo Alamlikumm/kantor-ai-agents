@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { agentById, AGENTS } from '../shared/roster.js';
 import { buildSystemPrompt } from './prompts.js';
+import { renderAutomatedVideo, isFFmpegInstalled } from './video_renderer.js';
 
 const { Pool } = pg;
 
@@ -17,8 +18,8 @@ const ROUTER_BASE_URL = process.env.ROUTER_BASE_URL || process.env.OPENAI_BASE_U
 const ROUTER_API_KEY = process.env.ROUTER_API_KEY || process.env.OPENAI_API_KEY || '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const ACCESS_CODE = process.env.ACCESS_CODE || '';
-const MODEL_LEADER = process.env.MODEL_LEADER || 'openai/gpt-6.1-sol';
-const MODEL_TEAM = process.env.MODEL_TEAM || 'anthropic/claude-sonnet-4.5';
+const MODEL_LEADER = process.env.MODEL_LEADER || 'claude-3-5-sonnet-latest';
+const MODEL_TEAM = process.env.MODEL_TEAM || 'claude-3-5-haiku-latest';
 const MAX_TOKENS = Number(process.env.MAX_TOKENS || 1500);
 const RATE_PER_MINUTE = Number(process.env.RATE_PER_MINUTE || 15);
 const DAILY_MAX_REQUESTS = Number(process.env.DAILY_MAX_REQUESTS || 300);
@@ -611,6 +612,29 @@ Tugasmu sebagai Planner:
       );
       postId = insertRes.rows[0]?.id;
       console.log(`[db] Post #${postId} tersimpan di PostgreSQL kantor_ai`);
+
+      // Otomatis Render Video Gratis via FFmpeg di Background
+      if (postId) {
+        (async () => {
+          try {
+            const hookMatch = draft.match(/Hook[^:]*:\s*([^\n\r]+)/i) || draft.match(/^([^\n\r]+)/);
+            const hookText = hookMatch ? hookMatch[1].trim() : topic;
+            const renderRes = await renderAutomatedVideo({
+              postId,
+              topic,
+              hook: hookText,
+              script: draft,
+              duration: 10,
+            });
+            if (renderRes.success && renderRes.videoUrl) {
+              await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [renderRes.videoUrl, postId]);
+              broadcastEvent('video_rendered', { postId, videoUrl: renderRes.videoUrl });
+            }
+          } catch (vErr) {
+            console.error('[auto-render-error]', vErr.message);
+          }
+        })();
+      }
     } catch (dbErr) {
       console.error('[db insert error]', dbErr.message);
     }
@@ -664,6 +688,94 @@ app.post('/api/pipeline/approve', requireAccess, async (req, res) => {
     });
   } catch (err) {
     console.error('[approve error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4b. Endpoint Tautkan Video Hasil Render (Dipanggil n8n / AI Video Renderer)
+app.post('/api/pipeline/attach-video', requireAccess, async (req, res) => {
+  try {
+    const { postId, videoUrl } = req.body;
+    if (!postId || !videoUrl) {
+      return res.status(400).json({ success: false, error: 'postId dan videoUrl wajib diisi.' });
+    }
+
+    const updateRes = await pgPool.query(
+      `UPDATE social_posts 
+       SET post_url = $1 
+       WHERE id = $2 
+       RETURNING id, topic, platform, post_url, status`,
+      [String(videoUrl).trim(), Number(postId)]
+    );
+
+    if (!updateRes.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: `Post #${postId} tidak ditemukan di database.`,
+      });
+    }
+
+    broadcastEvent('video_rendered', {
+      postId: Number(postId),
+      videoUrl,
+    });
+
+    console.log(`[video-render] Video berhasil ditautkan ke Post #${postId}: ${videoUrl}`);
+    res.json({
+      success: true,
+      message: `Video untuk Post #${postId} berhasil ditautkan!`,
+      post: updateRes.rows[0],
+    });
+  } catch (err) {
+    console.error('[attach video error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4c. Endpoint Render Video Manual / On-Demand via FFmpeg Gratis
+app.post('/api/pipeline/render-video', requireAccess, async (req, res) => {
+  try {
+    const { postId, duration = 8 } = req.body;
+    if (!postId) {
+      return res.status(400).json({ success: false, error: 'postId wajib diisi.' });
+    }
+
+    const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [Number(postId)]);
+    if (!r.rows.length) {
+      return res.status(404).json({ success: false, error: `Post #${postId} tidak ditemukan di database.` });
+    }
+
+    const post = r.rows[0];
+    const script = post.draft_nadia || post.final_content || '';
+    const hookMatch = script.match(/Hook[^:]*:\s*([^\n\r]+)/i) || script.match(/^([^\n\r]+)/);
+    const hookText = hookMatch ? hookMatch[1].trim() : post.topic;
+
+    const renderRes = await renderAutomatedVideo({
+      postId: post.id,
+      topic: post.topic,
+      hook: hookText,
+      script,
+      duration: Number(duration),
+    });
+
+    if (renderRes.success && renderRes.videoUrl) {
+      await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [renderRes.videoUrl, post.id]);
+      broadcastEvent('video_rendered', { postId: post.id, videoUrl: renderRes.videoUrl });
+      return res.json({
+        success: true,
+        message: `Video untuk Post #${post.id} berhasil di-render via FFmpeg!`,
+        videoUrl: renderRes.videoUrl,
+        elapsedMs: renderRes.elapsedMs,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: renderRes.error || renderRes.message || 'Gagal merender video.',
+      reason: renderRes.reason,
+    });
+  } catch (err) {
+    console.error('[render-video-error]', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -1134,7 +1246,12 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// ---------- Frontend hasil build (produksi) ----------
+// ---------- Static Videos & Frontend hasil build (produksi) ----------
+const videosDir = fileURLToPath(new URL('../dist/videos', import.meta.url));
+if (existsSync(videosDir)) {
+  app.use('/videos', express.static(videosDir));
+}
+
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 if (existsSync(dist)) {
   app.use(express.static(dist, { maxAge: '1h' }));
