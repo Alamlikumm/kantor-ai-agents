@@ -1,0 +1,10 @@
+.env
+.env.*
+node_modules
+dist
+.git
+.gitignore
+*.log
+cloudflared.exe
+*.exe
+sales_navigate_workflow.json

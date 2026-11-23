@@ -406,7 +406,7 @@ app.get('/api/config', (req, res) => {
 app.get('/api/verify', requireAccess, (req, res) => res.json({ ok: true }));
 
 // Endpoint riwayat tugas antar-agen
-app.get('/api/agent/tasks', (req, res) => {
+app.get('/api/agent/tasks', requireAccess, (req, res) => {
   res.json({ success: true, count: interAgentTasks.length, tasks: interAgentTasks });
 });
 
@@ -513,7 +513,7 @@ app.post('/api/chat', requireAccess, rateLimit, dailyCap, async (req, res) => {
 // 2. Endpoint REST Non-Streaming (Khusus integrasi n8n & WAHA WhatsApp)
 app.post('/api/agent/chat', requireAccess, rateLimit, dailyCap, async (req, res) => {
   try {
-    const { agentId = 'rina', message, history = [] } = req.body;
+    const { agentId = 'agnes', message, history = [] } = req.body;
     const agent = agentById(agentId);
     if (!agent) {
       return res.status(404).json({ success: false, error: 'Agent karyawan tidak ditemukan.' });
@@ -635,7 +635,7 @@ Tugasmu sebagai Planner:
 });
 
 // 4. Endpoint Approval (Dipanggil n8n saat Bos Ridho balas 'APPROVE' via WhatsApp)
-app.post('/api/pipeline/approve', async (req, res) => {
+app.post('/api/pipeline/approve', requireAccess, async (req, res) => {
   try {
     const { postId } = req.body;
     if (!postId) {
@@ -809,7 +809,7 @@ Tugasmu sebagai Sean (Sales Admin Navigate):
   }
 });
 
-app.get('/api/sales/inquiries', async (req, res) => {
+app.get('/api/sales/inquiries', requireAccess, async (req, res) => {
   try {
     const r = await pgPool.query('SELECT * FROM sales_inquiries ORDER BY id DESC LIMIT 20');
     res.json({ success: true, inquiries: r.rows });
@@ -818,7 +818,7 @@ app.get('/api/sales/inquiries', async (req, res) => {
   }
 });
 
-app.get('/api/sales/catalog', async (req, res) => {
+app.get('/api/sales/catalog', requireAccess, async (req, res) => {
   try {
     const docs = await searchSupabaseCatalog(req.query.q || '', Number(req.query.limit || 5));
     res.json({ success: true, count: docs.length, data: docs });
@@ -827,7 +827,7 @@ app.get('/api/sales/catalog', async (req, res) => {
   }
 });
 
-app.get('/api/sales/stocks', async (req, res) => {
+app.get('/api/sales/stocks', requireAccess, async (req, res) => {
   try {
     const stocks = await searchSupabaseStock(req.query.q || '', Number(req.query.limit || 10));
     res.json({ success: true, count: stocks.length, data: stocks });
@@ -836,7 +836,7 @@ app.get('/api/sales/stocks', async (req, res) => {
   }
 });
 
-app.get('/api/sales/leads', async (req, res) => {
+app.get('/api/sales/leads', requireAccess, async (req, res) => {
   try {
     const leads = await getSupabaseProspectLeads(req.query.status || '', Number(req.query.limit || 10));
     res.json({ success: true, count: leads.length, data: leads });
