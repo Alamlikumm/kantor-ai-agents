@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { agentById, AGENTS } from '../shared/roster.js';
 import { buildSystemPrompt } from './prompts.js';
 import { renderAutomatedVideo, isFFmpegInstalled } from './video_renderer.js';
+import { generateProductImage } from './image_generator.js';
 
 const { Pool } = pg;
 
@@ -620,6 +621,8 @@ app.post('/api/pipeline/social-content', requireAccess, rateLimit, dailyCap, asy
 
     const charles = agentById('charles'); // Copywriter (pembuat draft)
     const patrick = agentById('patrick'); // Social Media Planner (Leader & reviewer)
+    const victor = agentById('victor');   // Video Creator (Content Production)
+    const gavin = agentById('gavin');     // Graphic Designer (Content Production)
 
     if (!charles || !patrick) {
       return res.status(500).json({ success: false, error: 'Agent charles atau patrick tidak ditemukan di roster.' });
@@ -706,7 +709,7 @@ Tugasmu sebagai Planner:
     localPosts.unshift(postRecord);
     persistLocalPosts();
 
-    // Step 4: Otomatis Render Video (Edge-TTS Voiceover + Remotion / FFmpeg Hybrid) di Background
+    // Step 4: Gavin generate visual produk AI + Victor & Engine render video
     (async () => {
       try {
         const hookMatch = draft.match(/Hook[^:]*:\s*([^\n\r]+)/i) || draft.match(/^([^\n\r]+)/);
@@ -730,6 +733,17 @@ Tugasmu sebagai Planner:
           specsList = ['Garansi Resmi PT Feihong', 'Kualitas Industri Standar Proyek', 'Efisiensi Daya Tinggi', 'Ready Stock Gudang'];
         }
 
+        // Gavin menghasilkan foto/visual produk Navigate
+        let productImgPath = null;
+        try {
+          const gavinResult = await generateProductImage({ postId, topic, specs: specsList });
+          if (gavinResult && gavinResult.success && gavinResult.imagePath) {
+            productImgPath = gavinResult.imagePath;
+          }
+        } catch (imgErr) {
+          console.warn('[pipeline] Gavin image gen error:', imgErr.message);
+        }
+
         const renderRes = await renderAutomatedVideo({
           postId,
           topic,
@@ -739,14 +753,21 @@ Tugasmu sebagai Planner:
           specs: specsList,
           cta: 'Hubungi WhatsApp Tim Sales Sean Sekarang',
           duration: 10,
+          productImagePath: productImgPath,
         });
+
         if (renderRes.success && renderRes.videoUrl) {
           try {
             await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [renderRes.videoUrl, postId]);
           } catch {}
           postRecord.post_url = renderRes.videoUrl;
           persistLocalPosts();
-          broadcastEvent('video_rendered', { postId, videoUrl: renderRes.videoUrl, engine: renderRes.engine });
+          broadcastEvent('video_rendered', {
+            postId,
+            videoUrl: renderRes.videoUrl,
+            engine: renderRes.engine,
+            productImageUrl: renderRes.productImageUrl,
+          });
           console.log(`[video-rendered] Video (${renderRes.engine || 'render'}) selesai & ditautkan ke Post #${postId}: ${renderRes.videoUrl}`);
         }
       } catch (vErr) {
@@ -759,8 +780,10 @@ Tugasmu sebagai Planner:
       pipeline: 'social_content',
       postId,
       status: 'PENDING_APPROVAL',
-      creator: { id: charles.id, name: charles.name, role: charles.role },
-      leader: { id: patrick.id, name: patrick.name, role: patrick.role },
+      copywriter: { id: charles.id, name: charles.name, role: charles.role },
+      planner: { id: patrick.id, name: patrick.name, role: patrick.role },
+      visualDesigner: gavin ? { id: gavin.id, name: gavin.name, role: gavin.role } : null,
+      videoCreator: victor ? { id: victor.id, name: victor.name, role: victor.role } : null,
       platform,
       topic,
       draft,

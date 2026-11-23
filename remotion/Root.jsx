@@ -23,6 +23,7 @@ export const RemotionRoot = () => {
           'Bodi Aluminium Die-Cast Tebal',
         ],
         audioUrl: '',
+        productImageUrl: '',
         durationInSeconds: 10,
       }}
       calculateMetadata={async ({ props }) => {

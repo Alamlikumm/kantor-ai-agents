@@ -29,10 +29,13 @@ async function runTest() {
       return;
     }
 
-    console.log(`\n✅ Konten #${data.postId} berhasil dirumuskan oleh Charles & Patrick!`);
+    console.log(`\n✅ Konten #${data.postId} berhasil dirumuskan oleh Tim Content & Social!`);
     console.log(`📌 Topik: ${data.topic}`);
+    console.log(`✍️ Copywriter & Planner: Charles & Patrick`);
+    console.log(`🎨 Visual Desain: Gavin (Render Foto Produk AI Navigate)`);
+    console.log(`🎬 Video Creator: Victor (Video Engine + Animasi)`);
     console.log(`🎙️ Voiceover: Edge-TTS Neural Voice (Bahasa Indonesia Alami)`);
-    console.log(`⏳ Sedang merender video MP4 di background (estimasi 5-15 detik)...`);
+    console.log(`⏳ Sedang merender video MP4 di background (estimasi 8-15 detik)...`);
 
     let post = null;
     for (let i = 0; i < 25; i++) {
