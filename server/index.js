@@ -625,17 +625,36 @@ app.post('/api/pipeline/social-content', requireAccess, rateLimit, dailyCap, asy
       return res.status(500).json({ success: false, error: 'Agent charles atau patrick tidak ditemukan di roster.' });
     }
 
-    // Step 1: Charles membuat draft lengkap
-    const charlesPrompt = `Buatkan draft konten ${platform} lengkap untuk brand Navigate:
+    // Ambil data resmi spesifikasi produk & stok dari Supabase
+    let catalogContext = '';
+    let stockContext = '';
+    try {
+      const [matchingDocs, matchingStocks] = await Promise.all([
+        searchSupabaseCatalog(topic, 3),
+        searchSupabaseStock(topic, 5),
+      ]);
+      if (matchingDocs && matchingDocs.length > 0) {
+        catalogContext = matchingDocs.map((d, i) => `--- KATALOG RESMI NAVIGATE #${i + 1} ---\n${d.content.slice(0, 800)}`).join('\n\n');
+      }
+      if (matchingStocks && matchingStocks.length > 0) {
+        stockContext = matchingStocks.map(s => `- SKU ${s.sku}: ${s.product_name} | Stok: ${s.stock_gudang} ${s.unit || 'PCS'} | Warna: ${s.color_temp || '-'} | Watt: ${s.watt || '-'}`).join('\n');
+      }
+    } catch {}
+
+    // Step 1: Charles membuat draft lengkap & script voiceover
+    const charlesPrompt = `Buatkan draft konten ${platform} lengkap dan script video vertikal 9:16 untuk brand Navigate Lighting:
 - Topik: ${topic}
 - Target Audience: ${targetAudience}
 ${notes ? `- Catatan Tambahan: ${notes}` : ''}
+${catalogContext ? `\n[DATA SPESIFIKASI RESMI NAVIGATE DARI SUPABASE]:\n${catalogContext}` : ''}
+${stockContext ? `\n[DATA STOK GUDANG SUPABASE]:\n${stockContext}` : ''}
 
-Format draft yang harus kamu sertakan:
-1. Hook (3 detik pertama / baris awal yang langsung menarik perhatian)
-2. Isi Konten / Script / Slide Carousel Copy
-3. Call To Action (CTA) yang jelas dan kuat
-4. Rekomendasi 5-8 Hashtag relevan untuk Navigate`;
+Format draft yang WAJIB kamu sertakan:
+1. Hook (Teks singkat 1 kalimat pemikat untuk visual pembuka video)
+2. Narasi Voiceover (Naskah audio 3-5 kalimat singkat padat berbahasa Indonesia natural untuk dibacakan voiceover AI, sebutkan fitur spesifikasi real produk Navigate, keunggulan IP65/daya tahan, dan garansi resmi PT Feihong Trading International)
+3. Spesifikasi Unggulan (Daftar 3-4 poin spek utama: contoh "400 Watt", "IP65 Weatherproof", "Garansi 2 Tahun")
+4. Call To Action (CTA) yang jelas dan kuat (Ajak hubungi WhatsApp Sales)
+5. Rekomendasi 5-8 Hashtag relevan untuk Navigate`;
 
     const draft = await generateAgentReply(charles, charlesPrompt);
 
@@ -687,16 +706,38 @@ Tugasmu sebagai Planner:
     localPosts.unshift(postRecord);
     persistLocalPosts();
 
-    // Step 4: Otomatis Render Video Gratis via FFmpeg di Background
+    // Step 4: Otomatis Render Video (Edge-TTS Voiceover + Remotion / FFmpeg Hybrid) di Background
     (async () => {
       try {
         const hookMatch = draft.match(/Hook[^:]*:\s*([^\n\r]+)/i) || draft.match(/^([^\n\r]+)/);
         const hookText = hookMatch ? hookMatch[1].trim() : topic;
+
+        // Ekstrak Narasi Voiceover untuk dibacakan Edge-TTS
+        const narrationMatch = draft.match(/(?:Narasi Voiceover|Voiceover|Narasi|Script)[^:]*:\s*([\s\S]*?)(?=(?:\n\s*\d+\.|\n\s*Spesifikasi|\n\s*Call To Action|\n\s*CTA|$))/i);
+        const narrationText = narrationMatch ? narrationMatch[1].replace(/[\r\n]+/g, ' ').trim() : draft.slice(0, 200);
+
+        // Ekstrak 3-4 spesifikasi untuk animasi bullet
+        const specsMatch = draft.match(/(?:Spesifikasi Unggulan|Spesifikasi|Spek)[^:]*:\s*([\s\S]*?)(?=(?:\n\s*\d+\.|\n\s*Call To Action|\n\s*CTA|$))/i);
+        let specsList = [];
+        if (specsMatch) {
+          specsList = specsMatch[1]
+            .split(/[\n\r]+/)
+            .map(s => s.replace(/^[-*•\d.)\s]+/, '').trim())
+            .filter(s => s.length > 2 && s.length < 50)
+            .slice(0, 4);
+        }
+        if (specsList.length === 0) {
+          specsList = ['Garansi Resmi PT Feihong', 'Kualitas Industri Standar Proyek', 'Efisiensi Daya Tinggi', 'Ready Stock Gudang'];
+        }
+
         const renderRes = await renderAutomatedVideo({
           postId,
           topic,
           hook: hookText,
+          narration: narrationText,
           script: draft,
+          specs: specsList,
+          cta: 'Hubungi WhatsApp Tim Sales Sean Sekarang',
           duration: 10,
         });
         if (renderRes.success && renderRes.videoUrl) {
@@ -705,8 +746,8 @@ Tugasmu sebagai Planner:
           } catch {}
           postRecord.post_url = renderRes.videoUrl;
           persistLocalPosts();
-          broadcastEvent('video_rendered', { postId, videoUrl: renderRes.videoUrl });
-          console.log(`[video-rendered] Video selesai & ditautkan ke Post #${postId}: ${renderRes.videoUrl}`);
+          broadcastEvent('video_rendered', { postId, videoUrl: renderRes.videoUrl, engine: renderRes.engine });
+          console.log(`[video-rendered] Video (${renderRes.engine || 'render'}) selesai & ditautkan ke Post #${postId}: ${renderRes.videoUrl}`);
         }
       } catch (vErr) {
         console.error('[auto-render-error]', vErr.message);

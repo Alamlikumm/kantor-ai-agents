@@ -31,10 +31,11 @@ async function runTest() {
 
     console.log(`\n✅ Konten #${data.postId} berhasil dirumuskan oleh Charles & Patrick!`);
     console.log(`📌 Topik: ${data.topic}`);
-    console.log(`⏳ Sedang merender video MP4 via FFmpeg di background...`);
+    console.log(`🎙️ Voiceover: Edge-TTS Neural Voice (Bahasa Indonesia Alami)`);
+    console.log(`⏳ Sedang merender video MP4 di background (estimasi 5-15 detik)...`);
 
     let post = null;
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 25; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       try {
         const checkRes = await fetch(`http://localhost:${PORT}/api/pipeline/post/${data.postId}`);
