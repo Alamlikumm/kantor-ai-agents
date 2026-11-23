@@ -13,16 +13,29 @@ async function runTest() {
     notes: 'Sorot keunggulan 8 Modul Chip COB, bodi aluminium tebal, sertifikasi IP65 tahan air badai, dan garansi resmi PT Feihong Trading International',
   };
 
-  try {
-    const res = await fetch(`http://localhost:${PORT}/api/pipeline/social-content`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-access-code': ACCESS_CODE,
-      },
-      body: JSON.stringify(payload),
-    });
+  let res = null;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      res = await fetch(`http://localhost:${PORT}/api/pipeline/social-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': ACCESS_CODE,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) break;
+    } catch (connErr) {
+      if (attempt < 4) {
+        console.log(`⏳ Menunggu server Express siap (attempt ${attempt}/3)...`);
+        await new Promise((r) => setTimeout(r, 2000));
+      } else {
+        throw connErr;
+      }
+    }
+  }
 
+  try {
     const data = await res.json();
     if (!data.success) {
       console.error('❌ Gagal:', data.error);
