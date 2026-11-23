@@ -29,7 +29,7 @@ export function createTags(stage, container) {
       const { c, el } = it;
       const head = c.agent.leader;
       const single = it.single;
-      const active = c.status !== 'idle' || id === hoveredId || id === selectedId;
+      const active = c.status !== 'idle' || c.inPantry || id === hoveredId || id === selectedId;
       const visible = active || showAll || (showHeads && (head || single));
 
       c.headAnchor(v);
@@ -38,14 +38,20 @@ export function createTags(stage, container) {
       const y = (-v.y * 0.5 + 0.5) * h;
       const inView = v.z > -1 && v.z < 1 && x > -80 && x < w + 80 && y > -40 && y < h + 40;
 
-      const state = `${visible && inView ? 1 : 0}|${c.status}|${id === selectedId ? 1 : 0}`;
+      const state = `${visible && inView ? 1 : 0}|${c.status}|${c.customTag || ''}|${c.inPantry ? 1 : 0}|${id === selectedId ? 1 : 0}`;
       if (state !== it.last) {
         it.last = state;
         el.classList.toggle('on', visible && inView);
         el.classList.toggle('working', c.status === 'working');
         el.classList.toggle('done', c.status === 'done');
         el.classList.toggle('selected', id === selectedId);
-        it.st.textContent = c.status === 'working' ? 'mengetik…' : c.status === 'done' ? 'selesai' : '';
+        it.st.textContent = c.customTag
+          ? `⚙️ ${c.customTag}`
+          : (c.status === 'working'
+            ? '⚙️ Sedang mengerjakan tugas…'
+            : c.status === 'done'
+              ? '✅ Tugas selesai!'
+              : (c.inPantry ? '☕ ngopi di pantry' : (c.walk > 0.4 ? 'jalan…' : '')));
       }
       if (visible && inView) {
         el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%)`;

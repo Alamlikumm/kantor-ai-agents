@@ -91,6 +91,49 @@ function addSeat(inner, chars, agent, x, z, opts) {
   return { ch, deskGroup };
 }
 
+// Rute koordinat dari meja kerja ke Pantry melalui koridor
+function makePantryRoute(cx, cz, deskX, deskZ, spotIndex) {
+  const pts = [];
+
+  // 1. Geser dari meja ke lorong dalam ruangan
+  if (deskZ < -1.0) {
+    pts.push([1.6, deskZ]);
+    pts.push([1.6, 1.2]);
+  } else {
+    pts.push([deskX, 1.2]);
+  }
+  pts.push([0, 1.5]);
+
+  // 2. Keluar melewati pintu depan ruangan (local z = 4.3)
+  pts.push([0, 4.3]);
+
+  // 3. Masuk ke koridor antarbangunan (local z = 5.25)
+  pts.push([0, 5.25]);
+
+  // 4. Belok ke koridor timur menuju arah Pantry (world x = 6.25 atau x = 12.5)
+  if (cx < 12.5) {
+    pts.push([6.25 - cx, 5.25]);
+    pts.push([6.25 - cx, 15.0 - cz]);
+    pts.push([12.5 - cx, 15.0 - cz]);
+  } else {
+    pts.push([0, 15.0 - cz]);
+  }
+
+  // 5. Masuk ke pintu depan Pantry (world x = 12.5, z = 14.2)
+  pts.push([12.5 - cx, 14.2 - cz]);
+
+  // 6. Spot santai di dalam Pantry
+  // Spot 0: Mesin Kopi, Spot 1: Sofa Santai, Spot 2: Dispenser Air
+  const spots = [
+    [15.5 - cx, 7.8 - cz],
+    [12.5 - cx, 9.2 - cz],
+    [16.2 - cx, 8.5 - cz],
+  ];
+  pts.push(spots[spotIndex % spots.length]);
+
+  return pts;
+}
+
 function buildDivisionRoom(div, scene, chars) {
   const room = new THREE.Group();
   const cx = (div.col - 1) * PITCH_X;
@@ -106,16 +149,24 @@ function buildDivisionRoom(div, scene, chars) {
   const members = agentsOf(div.id);
   const leader = members.find((m) => m.leader);
   const team = members.filter((m) => !m.leader);
-  const glowColors = { proposal: '#cfe0ff', ads: '#ffd9bd', social: '#ffd0e6', qa: '#c9f2dc', dev: '#1f2a44', reporting: '#c8f3ee', account: '#fff0c4', finance: '#d9e2f2' };
+  const glowColors = { direksi: '#d8b4fe', manajer: '#bae6fd', social: '#fbcfe8', content: '#fed7aa', sales: '#bbf7d0' };
   const lc = glowColors[div.id] || '#8ec5ff';
 
   if (leader) {
-    // tim 4 orang: leader di belakang, 3 anggota satu baris
+    // Leader meja di belakang
     const L = addSeat(inner, chars, leader, 0, -3.0, { deskW: 2.6, deskD: 1.3, color: div.color, index: 0, laptopColor: lc });
     L.ch.roams = true;
-    L.ch.roamPath = [[1.75, -3.0], [1.75, 3.0]];
+    L.ch.isPantryBreak = true;
+    L.ch.roamPath = makePantryRoute(cx, cz, 0, -3.0, chars.length);
+    L.ch.routineT = 18 + (chars.length % 5) * 22 + Math.random() * 8;
+
     team.forEach((m, i) => {
-      addSeat(inner, chars, m, [-3.4, 0, 3.4][i], 0.3, { deskW: 2.2, deskD: 1.2, color: div.color, index: i + 1, laptopColor: lc });
+      const tx = [-3.4, 0, 3.4][i] ?? (i * 2.2 - 2.2);
+      const seat = addSeat(inner, chars, m, tx, 0.3, { deskW: 2.2, deskD: 1.2, color: div.color, index: i + 1, laptopColor: lc });
+      seat.ch.roams = true;
+      seat.ch.isPantryBreak = true;
+      seat.ch.roamPath = makePantryRoute(cx, cz, tx, 0.3, chars.length);
+      seat.ch.routineT = 25 + (chars.length % 7) * 24 + Math.random() * 10;
     });
     place(inner, F.clock(), 0, 2.3, -ROOM_D / 2 + 0.05);
     place(inner, F.plant(1), -4.3, 0, 3.3);
@@ -123,9 +174,13 @@ function buildDivisionRoom(div, scene, chars) {
     place(inner, F.plant(0.9), 4.4, 0, -3.5);
   } else {
     const m = members[0];
-    const S = addSeat(inner, chars, m, 0, -2.4, { deskW: 2.6, deskD: 1.3, color: div.color, index: 0, laptopColor: lc });
-    S.ch.roams = true;
-    S.ch.roamPath = [[2.2, -2.4], [2.2, 2.8]];
+    if (m) {
+      const S = addSeat(inner, chars, m, 0, -2.4, { deskW: 2.6, deskD: 1.3, color: div.color, index: 0, laptopColor: lc });
+      S.ch.roams = true;
+      S.ch.isPantryBreak = true;
+      S.ch.roamPath = makePantryRoute(cx, cz, 0, -2.4, chars.length);
+      S.ch.routineT = 20 + (chars.length % 6) * 20 + Math.random() * 8;
+    }
     place(inner, F.clock(), 0, 2.3, -ROOM_D / 2 + 0.05);
     place(inner, F.plant(1), -4.3, 0, 3.3);
     place(inner, F.plant(1.1), 4.3, 0, 3.3);
@@ -134,42 +189,31 @@ function buildDivisionRoom(div, scene, chars) {
   // properti khas divisi
   const wallZ = -ROOM_D / 2 + 0.2;
   switch (div.id) {
-    case 'proposal':
-      place(inner, F.whiteboard(2.6, 1.3), -3.3, 1.75, -ROOM_D / 2 + 0.06);
+    case 'direksi':
+      place(inner, F.sofa(2.8, '#581c87'), -3.0, 0, -2.8);
+      place(inner, F.table(1.4, 0.8, '#d9b98c'), -3.0, 0, -1.5);
       place(inner, F.bookshelf(2.2, 2.1), 3.3, 0, wallZ + 0.1);
+      place(inner, F.whiteboard(2.4, 1.2), 3.3, 1.75, -ROOM_D / 2 + 0.06);
       break;
-    case 'ads':
-      place(inner, F.whiteboard(2.6, 1.3), -3.3, 1.75, -ROOM_D / 2 + 0.06);
-      place(inner, F.bookshelf(2.2, 2.1), 3.3, 0, wallZ + 0.1);
-      place(inner, F.megaphone(), 4.0, 1.4, 3.5, -0.5);
+    case 'manajer':
+      place(inner, F.chartWall(3.6, 1.9), -2.8, 1.75, -ROOM_D / 2 + 0.06);
+      place(inner, F.bookshelf(2.2, 2.1), 3.5, 0, wallZ + 0.1);
+      place(inner, F.filingCabinet(), -3.8, 0, 2.8);
       break;
     case 'social':
       place(inner, F.whiteboard(2.6, 1.3), -3.3, 1.75, -ROOM_D / 2 + 0.06);
       place(inner, F.ringLight(), -4.2, 0, 2.6, 0.5);
       place(inner, F.bookshelf(2.2, 2.1), 3.3, 0, wallZ + 0.1);
       break;
-    case 'qa':
+    case 'content':
       place(inner, F.whiteboard(2.6, 1.3), -3.3, 1.75, -ROOM_D / 2 + 0.06);
-      place(inner, F.deviceShelf(), 3.3, 0, wallZ + 0.2);
+      place(inner, F.ringLight(), 3.8, 0, 2.5, -0.4);
+      place(inner, F.deviceShelf(), 3.5, 0, wallZ + 0.2);
       break;
-    case 'dev':
-      place(inner, F.whiteboard(2.6, 1.3), -3.3, 1.75, -ROOM_D / 2 + 0.06);
-      place(inner, F.serverRack(), 3.9, 0, -3.2);
-      break;
-    case 'reporting':
-      place(inner, F.chartWall(3.6, 1.9), -2.8, 1.75, -ROOM_D / 2 + 0.06);
-      place(inner, F.bookshelf(2.2, 2.1), 3.5, 0, wallZ + 0.1);
-      break;
-    case 'account':
-      place(inner, F.sofa(2.6), -3.3, 0, -3.3);
-      place(inner, F.table(1.4, 0.9), -3.3, 0, -1.9);
-      place(inner, F.whiteboard(2.4, 1.2), 3.3, 1.75, -ROOM_D / 2 + 0.06);
-      break;
-    case 'finance':
-      place(inner, F.safe(), 3.8, 0, -3.3);
-      place(inner, F.filingCabinet(), -3.8, 0, -3.5);
-      place(inner, F.filingCabinet(), -3.0, 0, -3.5);
-      place(inner, F.calculator(), 0.9, 0, -0.55);
+    case 'sales':
+      place(inner, F.chartWall(3.4, 1.8), -2.8, 1.75, -ROOM_D / 2 + 0.06);
+      place(inner, F.filingCabinet(), 3.8, 0, -3.2);
+      place(inner, F.sofa(2.4, '#15803d'), -3.2, 0, -2.5);
       break;
     default:
   }

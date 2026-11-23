@@ -1,0 +1,12 @@
+services:
+  kantor-navigate:
+    build: .
+    container_name: kantor-navigate
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - PORT=3001
+      - NODE_ENV=production

@@ -60,8 +60,16 @@ export async function streamChat(agentId, messages, { onText, signal }) {
   }
 
   if (!res.ok) {
-    let msg = 'Terjadi kesalahan.';
-    try { msg = (await res.json()).error || msg; } catch { /* abaikan */ }
+    let msg = `Terjadi kesalahan (HTTP ${res.status}).`;
+    try {
+      const data = await res.json();
+      msg = data.error || msg;
+    } catch {
+      try {
+        const raw = await res.text();
+        if (raw) msg = `Error (${res.status}): ${raw.slice(0, 120)}`;
+      } catch { /* abaikan */ }
+    }
     const err = new Error(msg);
     err.code = res.status;
     throw err;
