@@ -196,9 +196,10 @@ $('gate-form').addEventListener('submit', async (e) => {
   banner.hidden = !(config.offline || (config.demo && selectedId));
   if (config.needsCode && !getCode()) showGate('');
 
-  // buka karyawan dari URL, mis. https://office.devan.my.id/#rina
-  const hash = decodeURIComponent(location.hash.slice(1));
-  if (hash && byId.has(hash)) selectAgent(hash);
+  // buka karyawan dari URL, mis. https://office.domain.com/#agnes?review=12
+  const rawHash = location.hash.slice(1);
+  const hashId = decodeURIComponent(rawHash.split('?')[0]);
+  if (hashId && byId.has(hashId)) selectAgent(hashId);
   else goTo('overview');
 
   const hide = () => {

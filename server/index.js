@@ -957,11 +957,44 @@ app.get('/api/sales/leads', requireAccess, async (req, res) => {
   }
 });
 
-// 5. Halaman Web Review Interaktif untuk Bos Ridho (Dibuka via Link WhatsApp)
+// Endpoint Ambil Detail Konten Spesifik untuk Meja Agnes
+app.get('/api/pipeline/post/:id', async (req, res) => {
+  try {
+    const postId = Number(req.params.id);
+    if (!postId) return res.status(400).json({ success: false, error: 'ID tidak valid.' });
+    const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [postId]);
+    if (!r.rows.length) return res.status(404).json({ success: false, error: 'Post tidak ditemukan.' });
+    res.json({ success: true, post: r.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint Ambil Daftar Konten Pending Approval untuk Meja Agnes
+app.get('/api/pipeline/pending', async (req, res) => {
+  try {
+    const r = await pgPool.query(
+      `SELECT id, topic, platform, post_url, status, draft_nadia, review_dewi, created_at 
+       FROM social_posts 
+       WHERE status = 'PENDING_APPROVAL' 
+       ORDER BY id DESC LIMIT 10`
+    );
+    res.json({ success: true, posts: r.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Halaman Review (Redirect Otomatis ke Meja Agnes di Kantor 3D)
 app.get('/review/:id', async (req, res) => {
   try {
     const postId = Number(req.params.id);
     if (!postId) return res.status(400).send('ID Postingan tidak valid.');
+
+    // Default: Langsung bawa Bos Ridho ke Meja Agnes di Kantor 3D!
+    if (req.query.raw !== 'true') {
+      return res.redirect(`/#agnes?review=${postId}`);
+    }
 
     const result = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [postId]);
     if (!result.rows.length) {

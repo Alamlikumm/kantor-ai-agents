@@ -1,6 +1,6 @@
 import { agentById, agentsOf, divisionById } from '../shared/roster.js';
 import { renderMarkdown } from './md.js';
-import { getHistory, setHistory, clearHistory, streamChat } from './chat.js';
+import { getHistory, setHistory, clearHistory, streamChat, getCode } from './chat.js';
 
 const $ = (id) => document.getElementById(id);
 const initials = (name) => name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
@@ -110,8 +110,122 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
       els.messages.appendChild(l.el);
       paint(l);
     }
+    if (agentId === 'agnes') {
+      loadAgnesReviewCard();
+    }
     scrollDown(true);
     syncSend();
+  }
+
+  async function loadAgnesReviewCard() {
+    try {
+      let targetId = null;
+      const hashParts = location.hash.split('?');
+      if (hashParts[1]) {
+        const p = new URLSearchParams(hashParts[1]);
+        targetId = p.get('review');
+      }
+      if (!targetId && location.search) {
+        targetId = new URLSearchParams(location.search).get('review');
+      }
+
+      let post = null;
+      if (targetId) {
+        const res = await fetch(`/api/pipeline/post/${targetId}`);
+        if (res.ok) {
+          const d = await res.json();
+          post = d.post;
+        }
+      }
+
+      if (!post) {
+        const res = await fetch('/api/pipeline/pending');
+        if (res.ok) {
+          const d = await res.json();
+          post = d.posts?.[0] || null;
+        }
+      }
+
+      if (!post || currentId !== 'agnes') return;
+
+      const existingCard = els.messages.querySelector('.agnes-review-card');
+      if (existingCard) existingCard.remove();
+
+      const card = document.createElement('div');
+      card.className = 'agnes-review-card';
+      const isApproved = post.status === 'APPROVED';
+
+      card.innerHTML = `
+        <div class="agnes-card-head">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:18px;">🎬</span>
+            <div>
+              <strong style="font-size:13.5px;color:#0f172a;">Review Konten #${post.id}</strong>
+              <div style="font-size:11px;color:#64748b;">${post.topic || 'Lampu Navigate'} · ${post.platform || 'Instagram'}</div>
+            </div>
+          </div>
+          <span class="badge ${isApproved ? 'badge-approved' : 'badge-pending'}">${post.status}</span>
+        </div>
+
+        <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);">
+          <video controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${post.post_url || '/videos/post-' + post.id + '.mp4'}"></video>
+        </div>
+
+        <div style="font-size:12px;color:#334155;background:#f8fafc;padding:10px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line);line-height:1.4;">
+          <b>Review Patrick:</b> ${(post.review_dewi || 'Konten siap dipublish').slice(0, 160)}...
+        </div>
+
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="btn-agnes-approve" class="btn-approve" ${isApproved ? 'disabled' : ''} style="flex:1;padding:10px;background:#10b981;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;">
+            ${isApproved ? '✅ SUDAH DI-APPROVE' : '✅ APPROVE & PUBLISH'}
+          </button>
+          <button type="button" id="btn-agnes-revision" style="padding:10px 14px;background:#f1f5f9;color:#334155;border:1px solid var(--line);border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;">
+            ✍️ Minta Revisi
+          </button>
+        </div>
+      `;
+
+      card.querySelector('#btn-agnes-approve')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = 'Memproses...';
+        try {
+          const r = await fetch('/api/pipeline/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-access-code': getCode() },
+            body: JSON.stringify({ postId: post.id }),
+          });
+          const res = await r.json();
+          if (res.success) {
+            btn.textContent = '✅ BERHASIL DI-APPROVE!';
+            btn.style.background = '#059669';
+            const b = card.querySelector('.badge');
+            if (b) {
+              b.className = 'badge badge-approved';
+              b.textContent = 'APPROVED';
+            }
+          } else {
+            alert(res.error || 'Gagal approve');
+            btn.disabled = false;
+            btn.textContent = '✅ APPROVE & PUBLISH';
+          }
+        } catch {
+          alert('Gagal menghubungi server.');
+          btn.disabled = false;
+          btn.textContent = '✅ APPROVE & PUBLISH';
+        }
+      });
+
+      card.querySelector('#btn-agnes-revision')?.addEventListener('click', () => {
+        els.input.value = `Agnes, tolong instruksikan tim untuk revisi konten #${post.id} "${post.topic}": `;
+        autosize();
+        els.input.focus();
+      });
+
+      els.messages.insertBefore(card, els.messages.firstChild);
+    } catch (e) {
+      console.warn('[agnes review card error]', e);
+    }
   }
 
   function syncSend() {
