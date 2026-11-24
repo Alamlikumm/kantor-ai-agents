@@ -180,34 +180,32 @@ export async function renderAutomatedVideo({
   }
 
   let cmd = '';
+  const audioArgs = hasVoiceover
+    ? `-i "${audioPath}"`
+    : `-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100`;
 
   if (activeProductImage && existsSync(activeProductImage)) {
     // Mode Visual Lengkap: Background + Foto Produk Overlay di Tengah + Teks Hook + Badges + Audio
     const filterComplex = [
-      `[0:v]color=c=0x070b14:s=1080x1920:d=${finalDuration}[bg]`,
-      `[1:v]scale=920:640:force_original_aspect_ratio=decrease[prod]`,
-      `[bg][prod]overlay=(W-w)/2:460[v1]`,
-      `[v1]drawbox=x=80:y=120:w=920:h=6:color=0x0ea5e9@0.9:t=fill,` +
-      `drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=48:x=(w-text_w)/2:y=160,` +
-      `drawtext=text='PT FEIHONG TRADING INTERNATIONAL'${fontParam}:fontcolor=0x94a3b8:fontsize=24:x=(w-text_w)/2:y=220,` +
-      `drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=42:x=(w-text_w)/2:y=310,` +
-      `drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=380,` +
-      `drawbox=x=120:y=1140:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
-      `drawtext=text='V  ${safeSpec1}'${fontParam}:fontcolor=0x4ade80:fontsize=28:x=(w-text_w)/2:y=1160,` +
-      `drawbox=x=120:y=1230:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
-      `drawtext=text='V  ${safeSpec2}'${fontParam}:fontcolor=0x38bdf8:fontsize=28:x=(w-text_w)/2:y=1250,` +
-      `drawbox=x=120:y=1320:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
-      `drawtext=text='V  ${safeSpec3}'${fontParam}:fontcolor=0xfbcfe8:fontsize=28:x=(w-text_w)/2:y=1340,` +
-      `drawbox=x=120:y=1440:w=840:h=120:color=0x16a34a@0.95:t=fill,` +
-      `drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=1475,` +
-      `drawtext=text='Dapatkan Katalog Resmi & Harga Proyek'${fontParam}:fontcolor=0xdcfce7:fontsize=20:x=(w-text_w)/2:y=1515[vout]`,
+      `[1:v]scale=920:640:force_original_aspect_ratio=decrease,format=rgba[prod]`,
+      `[0:v][prod]overlay=(W-w)/2:440[v1]`,
+      `[v1]drawbox=x=80:y=100:w=920:h=6:color=0x0ea5e9@0.9:t=fill,` +
+      `drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=48:x=(w-text_w)/2:y=140,` +
+      `drawtext=text='PT FEIHONG TRADING INTERNATIONAL'${fontParam}:fontcolor=0x94a3b8:fontsize=24:x=(w-text_w)/2:y=200,` +
+      `drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=40:x=(w-text_w)/2:y=290,` +
+      `drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=360,` +
+      `drawbox=x=120:y=1120:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
+      `drawtext=text='V  ${safeSpec1}'${fontParam}:fontcolor=0x4ade80:fontsize=28:x=(w-text_w)/2:y=1140,` +
+      `drawbox=x=120:y=1210:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
+      `drawtext=text='V  ${safeSpec2}'${fontParam}:fontcolor=0x38bdf8:fontsize=28:x=(w-text_w)/2:y=1230,` +
+      `drawbox=x=120:y=1300:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
+      `drawtext=text='V  ${safeSpec3}'${fontParam}:fontcolor=0xfbcfe8:fontsize=28:x=(w-text_w)/2:y=1320,` +
+      `drawbox=x=120:y=1420:w=840:h=130:color=0x16a34a@0.95:t=fill,` +
+      `drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=1455,` +
+      `drawtext=text='Dapatkan Katalog Resmi & Harga Proyek'${fontParam}:fontcolor=0xdcfce7:fontsize=20:x=(w-text_w)/2:y=1495[vout]`,
     ].join(';');
 
-    const audioInput = hasVoiceover
-      ? `-i "${audioPath}" -c:a aac -b:a 128k`
-      : `-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -c:a aac -b:a 128k`;
-
-    cmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" -i "${activeProductImage}" ${audioInput} -filter_complex "${filterComplex}" -map "[vout]" -map 2:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -t ${finalDuration} "${outputPath}"`;
+    cmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" -loop 1 -t ${finalDuration} -i "${activeProductImage}" ${audioArgs} -filter_complex "${filterComplex}" -map "[vout]" -map 2:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
   } else {
     // Mode Tanpa Gambar: Layout Card Teks
     const filterGraph = [
@@ -230,17 +228,23 @@ export async function renderAutomatedVideo({
       `drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=1445`,
     ].join(',');
 
-    const audioInput = hasVoiceover
-      ? `-i "${audioPath}" -c:a aac -b:a 128k`
-      : `-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -c:a aac -b:a 128k`;
-
-    cmd = `ffmpeg -y -f lavfi -i "${filterGraph}" ${audioInput} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -t ${finalDuration} "${outputPath}"`;
+    cmd = `ffmpeg -y -f lavfi -i "${filterGraph}" ${audioArgs} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
   }
 
   try {
     console.log(`[video-renderer] Memulai render FFmpeg (Gambar: ${activeProductImage ? 'Aktif' : 'None'}, Audio: ${hasVoiceover ? 'Edge-TTS' : 'Mute'}, Durasi: ${finalDuration}s)...`);
     const startTime = Date.now();
-    await execAsync(cmd);
+    try {
+      await execAsync(cmd);
+    } catch (primaryErr) {
+      if (activeProductImage) {
+        console.warn('[video-renderer] Render overlay gambar gagal, mencoba fallback card teks:', primaryErr.message);
+        const fallbackCmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration},drawbox=x=80:y=180:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawbox=x=80:y=1740:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=52:x=(w-text_w)/2:y=240,drawbox=x=80:y=480:w=920:h=780:color=0x0f172a@0.9:t=fill,drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=44:x=(w-text_w)/2:y=540,drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=36:x=(w-text_w)/2:y=640,drawbox=x=120:y=1400:w=840:h=130:color=0x16a34a@0.95:t=fill,drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=1445" ${audioArgs} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
+        await execAsync(fallbackCmd);
+      } else {
+        throw primaryErr;
+      }
+    }
     const elapsedMs = Date.now() - startTime;
     console.log(`[video-renderer] Render FFmpeg selesai dalam ${elapsedMs}ms: ${publicUrl}`);
     return {

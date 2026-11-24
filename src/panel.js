@@ -171,8 +171,18 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           <video controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${post.post_url || '/videos/post-' + post.id + '.mp4'}"></video>
         </div>
 
-        <div style="font-size:12px;color:#334155;background:#f8fafc;padding:10px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line);line-height:1.4;">
-          <b>Review Patrick:</b> ${(post.review_dewi || 'Konten siap dipublish').slice(0, 160)}...
+        <div style="font-size:12px;color:#334155;background:#f8fafc;padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line);line-height:1.5;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <strong style="color:#0f172a;font-size:12px;">📢 Naskah Iklan Facebook (Ad Copy):</strong>
+            <button type="button" id="btn-copy-adcopy" style="padding:4px 8px;font-size:11px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+              📋 Salin Naskah
+            </button>
+          </div>
+          <div style="max-height:110px;overflow-y:auto;white-space:pre-wrap;font-size:11.5px;color:#475569;background:#ffffff;padding:8px;border-radius:6px;border:1px solid #e2e8f0;">${(post.draft_nadia || post.final_content || '').trim()}</div>
+        </div>
+
+        <div style="font-size:11.5px;color:#475569;background:#f0fdf4;padding:8px 10px;border-radius:8px;margin-bottom:10px;border:1px solid #bbf7d0;">
+          <b>Review Patrick:</b> ${(post.review_dewi || 'Konten siap dipublish').slice(0, 140)}...
         </div>
 
         <div style="display:flex;gap:8px;">
@@ -184,6 +194,17 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           </button>
         </div>
       `;
+
+      card.querySelector('#btn-copy-adcopy')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const textToCopy = post.draft_nadia || post.final_content || '';
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            btn.textContent = '✅ Tersalin!';
+            setTimeout(() => { btn.textContent = '📋 Salin Naskah'; }, 2000);
+          }).catch(() => {});
+        }
+      });
 
       card.querySelector('#btn-agnes-approve')?.addEventListener('click', async (e) => {
         const btn = e.currentTarget;

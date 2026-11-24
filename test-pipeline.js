@@ -8,9 +8,9 @@ async function runTest() {
 
   const payload = {
     topic: 'Navigate LED Flood Light 400W IP65 Outdoor',
-    platform: 'Instagram Reels / TikTok',
-    targetAudience: 'Kontraktor Proyek, Pengelola Gudang & Lapangan',
-    notes: 'Sorot keunggulan 8 Modul Chip COB, bodi aluminium tebal, sertifikasi IP65 tahan air badai, dan garansi resmi PT Feihong Trading International',
+    platform: 'Facebook Video Ads & Reels (Navigate Proyek)',
+    targetAudience: 'Kontraktor Proyek, Pemilik Gudang/Pabrik, Pengembang Lapangan Olahraga & Toko Listrik',
+    notes: 'Iklan Facebook konversi tinggi: Hook pembuka tajam, sorot 8 Modul Chip COB super terang, bodi aluminium tebal anti karat, sertifikasi IP65 tahan air badai ekstrem, garansi resmi 2 tahun PT Feihong Trading International, dan CTA WhatsApp Sales Admin Sean untuk minta pricelist proyek.',
   };
 
   let res = null;
