@@ -148,6 +148,10 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
 
       if (!post || currentId !== 'agnes') return;
 
+      // Bersihkan greeting kosong dan quick chips agar layar review bersih dan rapi
+      els.messages.querySelector('.empty')?.remove();
+      els.quick.innerHTML = '';
+
       const existingCard = els.messages.querySelector('.agnes-review-card');
       if (existingCard) existingCard.remove();
 
@@ -221,9 +225,19 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           <button type="button" id="btn-agnes-approve" class="btn-approve" ${isApproved ? 'disabled' : ''} style="flex:1;padding:10px;background:#10b981;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;">
             ${isApproved ? '✅ SUDAH DI-APPROVE' : '✅ APPROVE & PUBLISH'}
           </button>
-          <button type="button" id="btn-agnes-revision" style="padding:10px 14px;background:#f1f5f9;color:#334155;border:1px solid var(--line);border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;">
+          <button type="button" id="btn-agnes-revision" style="padding:10px 14px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;">
             ✍️ Minta Revisi
           </button>
+        </div>
+
+        <!-- Form Inline Revisi Cepat Langsung di Kartu -->
+        <div id="agnes-revision-box" style="display:none;margin-top:10px;background:#fffbeb;border:1px solid #fde68a;padding:10px;border-radius:10px;">
+          <div style="font-size:11.5px;font-weight:700;color:#92400e;margin-bottom:6px;">✍️ Instruksi Revisi untuk Tim Agnes:</div>
+          <textarea id="agnes-revision-input" rows="2" style="width:100%;padding:8px;border:1px solid #fcd34d;border-radius:6px;font-size:11px;resize:vertical;font-family:inherit;box-sizing:border-box;" placeholder="Tulis instruksi revisi (contoh: ubah naskah hook lebih heboh, perjelas watt dan garansi)..."></textarea>
+          <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;">
+            <button type="button" id="btn-cancel-revision" style="padding:5px 10px;font-size:11px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;">Batal</button>
+            <button type="button" id="btn-submit-revision-direct" style="padding:6px 12px;font-size:11px;background:#d97706;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">🚀 Kirim Revisi ke Agnes</button>
+          </div>
         </div>
 
         <!-- OPSI TAMBAHAN: VIDEO AI UGC MODEL MANUSIA (HEDRA / KLING) -->
@@ -402,10 +416,31 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         }
       });
 
+      const revBox = card.querySelector('#agnes-revision-box');
+      const revInput = card.querySelector('#agnes-revision-input');
+
       card.querySelector('#btn-agnes-revision')?.addEventListener('click', () => {
+        if (revBox) {
+          const isHidden = revBox.style.display === 'none';
+          revBox.style.display = isHidden ? 'block' : 'none';
+          if (isHidden && revInput) {
+            revInput.focus();
+          }
+        }
         els.input.value = `Agnes, tolong instruksikan tim untuk revisi konten #${post.id} "${post.topic}": `;
         autosize();
-        els.input.focus();
+        syncSend();
+      });
+
+      card.querySelector('#btn-cancel-revision')?.addEventListener('click', () => {
+        if (revBox) revBox.style.display = 'none';
+      });
+
+      card.querySelector('#btn-submit-revision-direct')?.addEventListener('click', () => {
+        const note = (revInput?.value || '').trim();
+        const text = `Agnes, tolong instruksikan tim untuk revisi konten #${post.id} "${post.topic}": ${note || 'Tolong revisi naskah dan videonya.'}`;
+        if (revBox) revBox.style.display = 'none';
+        submit(text);
       });
 
       els.messages.insertBefore(card, els.messages.firstChild);

@@ -5,7 +5,7 @@ export const SKIN = ['#f3d2b3', '#e3b48a', '#c98f62', '#a97047', '#8a5a38'];
 
 export const DIVISIONS = [
   { id: 'direksi',   name: 'Direksi',           short: 'Direksi',  color: '#7c3aed', row: 0, col: 0 },
-  { id: 'manajer',   name: 'Executive Manager',  short: 'Manager',  color: '#0ea5e9', row: 0, col: 1 },
+  { id: 'manajer',   name: 'Manajemen Operasional', short: 'Manager',  color: '#0ea5e9', row: 0, col: 1 },
   { id: 'social',    name: 'Social Media',        short: 'Social',   color: '#ff5fa2', row: 0, col: 2 },
   { id: 'content',   name: 'Content Production',  short: 'Content',  color: '#f97316', row: 1, col: 0 },
   { id: 'sales',     name: 'Sales',               short: 'Sales',    color: '#16a34a', row: 1, col: 1 },
