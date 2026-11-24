@@ -168,7 +168,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         </div>
 
         <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);">
-          <video controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${post.post_url || '/videos/post-' + post.id + '.mp4'}"></video>
+          <video controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${post.post_url || '/videos/post-' + post.id + '.mp4'}" onerror="if(!this.dataset.retried){this.dataset.retried='1';setTimeout(()=>{this.src=this.src.split('?')[0]+'?t='+Date.now();},3000);}"></video>
         </div>
 
         <div style="font-size:12px;color:#334155;background:#f8fafc;padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line);line-height:1.5;">

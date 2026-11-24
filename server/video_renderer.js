@@ -169,82 +169,118 @@ export async function renderAutomatedVideo({
   const safeSpec2 = sanitizeText(specs[1] || 'IP65 WEATHERPROOF OUTDOOR', 40);
   const safeSpec3 = sanitizeText(specs[2] || 'EFISIENSI DAYA TINGGI', 40);
 
-  // Font default di Linux Ubuntu
-  const fontDejaVu = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
-  const fontFreeSans = '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf';
-  let fontParam = '';
-  if (existsSync(fontDejaVu)) {
-    fontParam = `:fontfile='${fontDejaVu}'`;
-  } else if (existsSync(fontFreeSans)) {
-    fontParam = `:fontfile='${fontFreeSans}'`;
+  function getLinuxFontParam() {
+  const candidates = [
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
+    '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+    '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
+    '/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf',
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return `:fontfile='${p}'`;
   }
+  return '';
+}
 
-  let cmd = '';
+function cleanFfmpegText(str, maxLen = 50) {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/['":\\%\[\]]/g, '')
+    .trim()
+    .slice(0, maxLen);
+}
+
+  const fontParam = getLinuxFontParam();
+
+  // Multi-Scene Timeline Victor (Night to Day Transformation - 25 Detik):
+  // Scene 1: 00:00 - 00:03 -> Gelap Total Outdoor (Hook Masalah)
+  // Scene 2: 00:03 - 00:09 -> Saklar ON: Gelap Jadi Siang (Navigate 400W)
+  // Scene 3: 00:09 - 00:16 -> Bedah 8 Modul COB 40.000 Lumens (Kualitas Cahaya)
+  // Scene 4: 00:16 - 00:22 -> Bodi Aluminium Die-Cast & IP65 (Ketahanan Ekstrem)
+  // Scene 5: 00:22 - 00:25 -> Outro Call To Action WhatsApp Sales Admin Sean
+
+  const filterGraph = [
+    // Base 9:16 Canvas Vertikal Full HD
+    `color=c=0x070b14:s=1080x1920:d=${finalDuration}`,
+
+    // Persistent Header & Branding (Seluruh Durasi)
+    `drawbox=x=80:y=80:w=920:h=6:color=0x0ea5e9@0.9:t=fill`,
+    `drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=48:x=(w-text_w)/2:y=130`,
+    `drawtext=text='PT FEIHONG TRADING INTERNATIONAL'${fontParam}:fontcolor=0x94a3b8:fontsize=24:x=(w-text_w)/2:y=190`,
+
+    // Persistent Footer (Seluruh Durasi)
+    `drawbox=x=80:y=1760:w=920:h=6:color=0x0ea5e9@0.9:t=fill`,
+    `drawtext=text='STANDAR PENCAHAYAAN PROYEK & INDUSTRI'${fontParam}:fontcolor=0x64748b:fontsize=22:x=(w-text_w)/2:y=1790`,
+
+    // SCENE 1 (0 - 3s): LAPANGAN GELAP TOTAL (HOOK MASALAH)
+    `drawbox=x=80:y=520:w=920:h=620:color=0x180b0b@0.95:t=fill:enable='between(t,0,3)'`,
+    `drawbox=x=80:y=520:w=920:h=620:color=0xef4444@0.8:t=4:enable='between(t,0,3)'`,
+    `drawtext=text='AREA OUTDOOR / GUDANG'${fontParam}:fontcolor=0xf87171:fontsize=32:x=(w-text_w)/2:y=580:enable='between(t,0,3)'`,
+    `drawtext=text='Lampu sorot biasa mati kutu di area seluas ini?'${fontParam}:fontcolor=0xffffff:fontsize=36:x=(w-text_w)/2:y=720:enable='between(t,0,3)'`,
+    `drawtext=text='GELAP TOTAL & REDUP MERUGIKAN PROYEK'${fontParam}:fontcolor=0xfca5a5:fontsize=28:x=(w-text_w)/2:y=850:enable='between(t,0,3)'`,
+
+    // SCENE 2 (3 - 9s): SAKLAR ON -> GELAP JADI SIANG BENDERANG!
+    `drawbox=x=80:y=460:w=920:h=740:color=0x0f172a@0.95:t=fill:enable='between(t,3,9)'`,
+    `drawbox=x=80:y=460:w=920:h=740:color=0xfacc15@0.9:t=4:enable='between(t,3,9)'`,
+    `drawtext=text='SAKLAR ON: GELAP JADI SIANG!'${fontParam}:fontcolor=0xfacc15:fontsize=46:x=(w-text_w)/2:y=520:enable='between(t,3,9)'`,
+    `drawtext=text='NAVIGATE 400W LED FLOOD LIGHT'${fontParam}:fontcolor=0xffffff:fontsize=36:x=(w-text_w)/2:y=610:enable='between(t,3,9)'`,
+    `drawbox=x=120:y=710:w=840:h=110:color=0x0284c7@0.95:t=fill:enable='between(t,3,9)'`,
+    `drawtext=text='SEKETIKA TERANG BENDERANG 100+ METER'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=745:enable='between(t,3,9)'`,
+    `drawtext=text='Sorotan Merata Tanpa Titik Gelap'${fontParam}:fontcolor=0x38bdf8:fontsize=30:x=(w-text_w)/2:y=880:enable='between(t,3,9)'`,
+    `drawtext=text='Efisiensi Daya Tinggi · Terang Maksimal'${fontParam}:fontcolor=0x4ade80:fontsize=26:x=(w-text_w)/2:y=950:enable='between(t,3,9)'`,
+
+    // SCENE 3 (9 - 16s): BEDAH 8 MODUL CHIP COB & 40.000 LUMENS
+    `drawbox=x=80:y=420:w=920:h=840:color=0x0b1329@0.95:t=fill:enable='between(t,9,16)'`,
+    `drawbox=x=80:y=420:w=920:h=840:color=0x38bdf8@0.7:t=3:enable='between(t,9,16)'`,
+    `drawtext=text='BEDAH KEKUATAN MODUL & CAHAYA'${fontParam}:fontcolor=0x38bdf8:fontsize=36:x=(w-text_w)/2:y=470:enable='between(t,9,16)'`,
+    `drawbox=x=120:y=550:w=840:h=90:color=0x1e293b@0.95:t=fill:enable='between(t,9,16)'`,
+    `drawtext=text='V  40.000+ LUMENS SUPER TERANG'${fontParam}:fontcolor=0x4ade80:fontsize=32:x=(w-text_w)/2:y=580:enable='between(t,9,16)'`,
+    `drawbox=x=120:y=670:w=840:h=90:color=0x1e293b@0.95:t=fill:enable='between(t,9,16)'`,
+    `drawtext=text='V  8 MODUL CHIP COB TERBAIK'${fontParam}:fontcolor=0x38bdf8:fontsize=32:x=(w-text_w)/2:y=700:enable='between(t,9,16)'`,
+    `drawbox=x=120:y=790:w=840:h=90:color=0x1e293b@0.95:t=fill:enable='between(t,9,16)'`,
+    `drawtext=text='V  ZERO FLICKER & NYAMAN DI MATA'${fontParam}:fontcolor=0xfbcfe8:fontsize=32:x=(w-text_w)/2:y=820:enable='between(t,9,16)'`,
+    `drawtext=text='Sorotan Padat Menembus Seluruh Sudut Proyek'${fontParam}:fontcolor=0x94a3b8:fontsize=26:x=(w-text_w)/2:y=940:enable='between(t,9,16)'`,
+    `drawtext=text='Lensa Optik Fokus & Terarah Presisi'${fontParam}:fontcolor=0x67e8f9:fontsize=24:x=(w-text_w)/2:y=1000:enable='between(t,9,16)'`,
+
+    // SCENE 4 (16 - 22s): BODI ALUMINIUM & KETAHANAN IP65
+    `drawbox=x=80:y=420:w=920:h=840:color=0x0f172a@0.95:t=fill:enable='between(t,16,22)'`,
+    `drawbox=x=80:y=420:w=920:h=840:color=0x22c55e@0.7:t=3:enable='between(t,16,22)'`,
+    `drawtext=text='KETAHANAN EKSTREM STANDAR PROYEK'${fontParam}:fontcolor=0x4ade80:fontsize=36:x=(w-text_w)/2:y=470:enable='between(t,16,22)'`,
+    `drawbox=x=120:y=550:w=840:h=90:color=0x1e293b@0.95:t=fill:enable='between(t,16,22)'`,
+    `drawtext=text='V  BODI FULL ALUMINIUM DIE-CAST'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=580:enable='between(t,16,22)'`,
+    `drawbox=x=120:y=670:w=840:h=90:color=0x1e293b@0.95:t=fill:enable='between(t,16,22)'`,
+    `drawtext=text='V  IP65 WATERPROOF TAHAN BADAI'${fontParam}:fontcolor=0x38bdf8:fontsize=32:x=(w-text_w)/2:y=700:enable='between(t,16,22)'`,
+    `drawbox=x=120:y=790:w=840:h=90:color=0x1e293b@0.95:t=fill:enable='between(t,16,22)'`,
+    `drawtext=text='V  GARANSI RESMI 2 TAHUN PT FEIHONG'${fontParam}:fontcolor=0xfacc15:fontsize=32:x=(w-text_w)/2:y=820:enable='between(t,16,22)'`,
+    `drawtext=text='Sirip Heatsink Tebal: Buang Panas Cepat & Maksimal'${fontParam}:fontcolor=0x94a3b8:fontsize=26:x=(w-text_w)/2:y=940:enable='between(t,16,22)'`,
+    `drawtext=text='Masa Pakai Awet Hingga 50.000 Jam'${fontParam}:fontcolor=0x86efac:fontsize=24:x=(w-text_w)/2:y=1000:enable='between(t,16,22)'`,
+
+    // SCENE 5 (22 - 25s): OUTRO & CALL TO ACTION SALES ADMIN SEAN
+    `drawbox=x=80:y=460:w=920:h=740:color=0x064e3b@0.95:t=fill:enable='between(t,22,25)'`,
+    `drawbox=x=80:y=460:w=920:h=740:color=0x22c55e@0.9:t=4:enable='between(t,22,25)'`,
+    `drawtext=text='UPGRADE PENERANGAN SEKARANG!'${fontParam}:fontcolor=0xfacc15:fontsize=42:x=(w-text_w)/2:y=520:enable='between(t,22,25)'`,
+    `drawtext=text='HUBUNGI SALES ADMIN SEAN (WHATSAPP)'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=620:enable='between(t,22,25)'`,
+    `drawbox=x=120:y=720:w=840:h=120:color=0x15803d@0.9:t=fill:enable='between(t,22,25)'`,
+    `drawtext=text='DAPATKAN KATALOG RESMI & PRICELIST'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=755:enable='between(t,22,25)'`,
+    `drawtext=text='Penawaran Spesial Kontraktor & Grosir'${fontParam}:fontcolor=0xdcfce7:fontsize=22:x=(w-text_w)/2:y=795:enable='between(t,22,25)'`,
+    `drawtext=text='Distributor Resmi: PT Feihong Trading International'${fontParam}:fontcolor=0x86efac:fontsize=24:x=(w-text_w)/2:y=940:enable='between(t,22,25)'`,
+  ].join(',');
+
   const audioArgs = hasVoiceover
     ? `-i "${audioPath}"`
     : `-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100`;
 
-  if (activeProductImage && existsSync(activeProductImage)) {
-    // Mode Visual Lengkap: Background + Foto Produk Overlay di Tengah + Teks Hook + Badges + Audio
-    const filterComplex = [
-      `[1:v]scale=920:640:force_original_aspect_ratio=decrease,format=rgba[prod]`,
-      `[0:v][prod]overlay=(W-w)/2:440[v1]`,
-      `[v1]drawbox=x=80:y=100:w=920:h=6:color=0x0ea5e9@0.9:t=fill,` +
-      `drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=48:x=(w-text_w)/2:y=140,` +
-      `drawtext=text='PT FEIHONG TRADING INTERNATIONAL'${fontParam}:fontcolor=0x94a3b8:fontsize=24:x=(w-text_w)/2:y=200,` +
-      `drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=40:x=(w-text_w)/2:y=290,` +
-      `drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=360,` +
-      `drawbox=x=120:y=1120:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
-      `drawtext=text='V  ${safeSpec1}'${fontParam}:fontcolor=0x4ade80:fontsize=28:x=(w-text_w)/2:y=1140,` +
-      `drawbox=x=120:y=1210:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
-      `drawtext=text='V  ${safeSpec2}'${fontParam}:fontcolor=0x38bdf8:fontsize=28:x=(w-text_w)/2:y=1230,` +
-      `drawbox=x=120:y=1300:w=840:h=70:color=0x1e293b@0.9:t=fill,` +
-      `drawtext=text='V  ${safeSpec3}'${fontParam}:fontcolor=0xfbcfe8:fontsize=28:x=(w-text_w)/2:y=1320,` +
-      `drawbox=x=120:y=1420:w=840:h=130:color=0x16a34a@0.95:t=fill,` +
-      `drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=1455,` +
-      `drawtext=text='Dapatkan Katalog Resmi & Harga Proyek'${fontParam}:fontcolor=0xdcfce7:fontsize=20:x=(w-text_w)/2:y=1495[vout]`,
-    ].join(';');
-
-    cmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" -loop 1 -t ${finalDuration} -i "${activeProductImage}" ${audioArgs} -filter_complex "${filterComplex}" -map "[vout]" -map 2:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
-  } else {
-    // Mode Tanpa Gambar: Layout Card Teks
-    const filterGraph = [
-      `color=c=0x070b14:s=1080x1920:d=${finalDuration}`,
-      `drawbox=x=80:y=180:w=920:h=6:color=0x0ea5e9@0.9:t=fill`,
-      `drawbox=x=80:y=1740:w=920:h=6:color=0x0ea5e9@0.9:t=fill`,
-      `drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=52:x=(w-text_w)/2:y=240`,
-      `drawtext=text='PT FEIHONG TRADING INTERNATIONAL'${fontParam}:fontcolor=0x94a3b8:fontsize=28:x=(w-text_w)/2:y=310`,
-      `drawbox=x=80:y=480:w=920:h=780:color=0x0f172a@0.9:t=fill`,
-      `drawbox=x=80:y=480:w=920:h=780:color=0x38bdf8@0.5:t=2`,
-      `drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=44:x=(w-text_w)/2:y=540`,
-      `drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=36:x=(w-text_w)/2:y=640`,
-      `drawbox=x=120:y=760:w=840:h=90:color=0x1e293b@0.9:t=fill`,
-      `drawtext=text='V  ${safeSpec1}'${fontParam}:fontcolor=0x4ade80:fontsize=32:x=(w-text_w)/2:y=790`,
-      `drawbox=x=120:y=880:w=840:h=90:color=0x1e293b@0.9:t=fill`,
-      `drawtext=text='V  ${safeSpec2}'${fontParam}:fontcolor=0x38bdf8:fontsize=32:x=(w-text_w)/2:y=910`,
-      `drawbox=x=120:y=1000:w=840:h=90:color=0x1e293b@0.9:t=fill`,
-      `drawtext=text='V  ${safeSpec3}'${fontParam}:fontcolor=0xfbcfe8:fontsize=32:x=(w-text_w)/2:y=1030`,
-      `drawbox=x=120:y=1400:w=840:h=130:color=0x16a34a@0.95:t=fill`,
-      `drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=1445`,
-    ].join(',');
-
-    cmd = `ffmpeg -y -f lavfi -i "${filterGraph}" ${audioArgs} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
-  }
+  const cmd = `ffmpeg -y -f lavfi -i "${filterGraph}" ${audioArgs} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
 
   try {
-    console.log(`[video-renderer] Memulai render FFmpeg (Gambar: ${activeProductImage ? 'Aktif' : 'None'}, Audio: ${hasVoiceover ? 'Edge-TTS' : 'Mute'}, Durasi: ${finalDuration}s)...`);
+    console.log(`[video-renderer] Memulai render FFmpeg Multi-Scene Victor (Audio: ${hasVoiceover ? 'Edge-TTS' : 'Mute'}, Durasi: ${finalDuration}s)...`);
     const startTime = Date.now();
-    try {
-      await execAsync(cmd);
-    } catch (primaryErr) {
-      if (activeProductImage) {
-        console.warn('[video-renderer] Render overlay gambar gagal, mencoba fallback card teks:', primaryErr.message);
-        const fallbackCmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration},drawbox=x=80:y=180:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawbox=x=80:y=1740:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=52:x=(w-text_w)/2:y=240,drawbox=x=80:y=480:w=920:h=780:color=0x0f172a@0.9:t=fill,drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=44:x=(w-text_w)/2:y=540,drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=36:x=(w-text_w)/2:y=640,drawbox=x=120:y=1400:w=840:h=130:color=0x16a34a@0.95:t=fill,drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=32:x=(w-text_w)/2:y=1445" ${audioArgs} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
-        await execAsync(fallbackCmd);
-      } else {
-        throw primaryErr;
-      }
-    }
+    await execAsync(cmd);
     const elapsedMs = Date.now() - startTime;
     console.log(`[video-renderer] Render FFmpeg selesai dalam ${elapsedMs}ms: ${publicUrl}`);
     return {
@@ -252,7 +288,7 @@ export async function renderAutomatedVideo({
       videoUrl: publicUrl,
       audioUrl: hasVoiceover ? audioPublicUrl : null,
       productImageUrl: activeProductPublicUrl,
-      engine: 'ffmpeg_with_edgetts',
+      engine: 'ffmpeg_multi_scene',
       duration: finalDuration,
       elapsedMs,
       fileName: outputFileName,

@@ -48,10 +48,10 @@ async function runTest() {
     console.log(`🎨 Visual Desain: Gavin (Render Foto Produk AI Navigate)`);
     console.log(`🎬 Video Creator: Victor (Video Engine + Animasi)`);
     console.log(`🎙️ Voiceover: Edge-TTS Neural Voice (Bahasa Indonesia Alami)`);
-    console.log(`⏳ Sedang merender video MP4 di background (estimasi 8-15 detik)...`);
+    console.log(`⏳ Sedang merender video MP4 Multi-Scene di background (estimasi 10-20 detik)...`);
 
     let post = null;
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 35; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       try {
         const checkRes = await fetch(`http://localhost:${PORT}/api/pipeline/post/${data.postId}`);
