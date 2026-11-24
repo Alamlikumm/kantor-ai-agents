@@ -113,6 +113,9 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
     if (agentId === 'agnes') {
       loadAgnesReviewCard();
     }
+    if (agentId === 'victor') {
+      loadVictorRenderCard();
+    }
     syncServerTasksForAgent(agentId);
     scrollDown(true);
     syncSend();
@@ -153,6 +156,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
             els.messages.appendChild(m.role === 'user' ? bubble('user', '', { text: m.content }) : bubble('assistant', renderMarkdown(m.content)));
           }
           if (agentId === 'agnes') loadAgnesReviewCard();
+          if (agentId === 'victor') loadVictorRenderCard();
           scrollDown(true);
         }
       }
@@ -503,6 +507,102 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
       els.messages.insertBefore(card, els.messages.firstChild);
     } catch (e) {
       console.warn('[agnes review card error]', e);
+    }
+  }
+
+  async function loadVictorRenderCard() {
+    try {
+      if (currentId !== 'victor') return;
+
+      const existingCard = els.messages.querySelector('.victor-video-card');
+      if (existingCard) existingCard.remove();
+
+      let postId = 1795490268558;
+      try {
+        const res = await fetch('/api/pipeline/pending');
+        if (res.ok) {
+          const d = await res.json();
+          if (d.posts?.[0]?.id) postId = d.posts[0].id;
+        }
+      } catch {}
+
+      const card = document.createElement('div');
+      card.className = 'victor-video-card';
+      card.style.cssText = 'margin:14px 0 10px 0;padding:14px;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:12px;box-shadow:0 4px 12px rgba(34,197,94,0.12);';
+
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+          <div style="font-weight:700;color:#15803d;font-size:13px;display:flex;align-items:center;gap:6px;">
+            <span style="font-size:18px;">🎬</span> Studio Video Victor · Navigate 400W
+          </div>
+          <span style="font-size:10.5px;background:#dcfce7;color:#166534;padding:3px 8px;border-radius:99px;font-weight:700;">Naskah 5-Scene Siap Render</span>
+        </div>
+        <p style="font-size:11.5px;color:#334155;margin:0 0 10px 0;line-height:1.45;">
+          Naskah storyboard 5-scene dan voiceover otentik di atas terhubung langsung ke mesin render FFmpeg & Edge-TTS. Klik tombol di bawah untuk langsung merender video vertikal 9:16 (durasi 25 detik) dengan foto produk otentik Navigate 400W & suara narasi bahasa Indonesia.
+        </p>
+        <button type="button" id="btn-victor-render-direct" style="width:100%;padding:10px 14px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(22,163,74,0.3);">
+          ⚡ Render Video FB Reels (25 Detik) Sekarang
+        </button>
+        <div id="victor-render-status" style="display:none;font-size:11px;color:#15803d;background:#dcfce7;border:1px solid #86efac;padding:8px 10px;border-radius:6px;margin-top:8px;text-align:center;line-height:1.4;"></div>
+        <div id="victor-video-preview-wrap" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;background:#000;">
+          <video id="victor-video-player" controls playsinline style="width:100%;max-height:240px;display:block;object-fit:cover;"></video>
+        </div>
+      `;
+
+      const btn = card.querySelector('#btn-victor-render-direct');
+      const statusBox = card.querySelector('#victor-render-status');
+      const previewWrap = card.querySelector('#victor-video-preview-wrap');
+      const player = card.querySelector('#victor-video-player');
+
+      btn?.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.innerHTML = '⏳ Sedang Merender 5 Scene Video Navigate 400W... (~5-15 detik)';
+        if (statusBox) {
+          statusBox.style.display = 'block';
+          statusBox.innerText = 'Menggabungkan 5 Scene Naskah + Foto Produk Navigate 400W + Voiceover Ardi Neural...';
+        }
+        try {
+          const res = await fetch('/api/pipeline/render-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-access-code': getCode() },
+            body: JSON.stringify({ postId, duration: 25 }),
+          });
+          const d = await res.json();
+          if (d.success && d.videoUrl) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.background = '#059669';
+            btn.innerHTML = '✅ Video Berhasil Dibuat! (Klik untuk Render Ulang)';
+            if (statusBox) {
+              statusBox.innerText = `Selesai dalam ${(d.elapsedMs / 1000).toFixed(1)} detik! Video siap diputar di bawah dan sudah diperbarui di Meja Agnes.`;
+            }
+            if (previewWrap && player) {
+              previewWrap.style.display = 'block';
+              player.src = d.videoUrl + '?t=' + Date.now();
+              player.load();
+              player.play().catch(() => {});
+            }
+          } else {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.background = '#dc2626';
+            btn.innerHTML = '❌ Gagal Render. Coba Lagi';
+            if (statusBox) statusBox.innerText = d.error || 'Terjadi kesalahan saat merender.';
+          }
+        } catch (err) {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.style.background = '#dc2626';
+          btn.innerHTML = '❌ Gagal Render. Coba Lagi';
+          if (statusBox) statusBox.innerText = err.message;
+        }
+      });
+
+      els.messages.appendChild(card);
+      scrollDown(true);
+    } catch (e) {
+      console.warn('[victor render card error]', e);
     }
   }
 
