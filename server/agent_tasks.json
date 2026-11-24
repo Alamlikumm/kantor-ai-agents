@@ -1,5 +1,19 @@
 [
   {
+    "id": "task-agnes-patrick-revisi-400w",
+    "fromId": "agnes",
+    "fromName": "Agnes",
+    "fromRole": "Executive Manager",
+    "toId": "patrick",
+    "toName": "Patrick",
+    "toRole": "Social Media Planner",
+    "task": "Update prioritas: fokus revisi konten #1795490268558 saat ini ada di kualitas video (dikerjakan Victor). Tahan dulu tugas Shenny untuk jadwal ulang publish sampai video disetujui Agnes. Charles dan Gavin tetap dilibatkan sesuai kebutuhan hasil audit. Kirim ringkasan audit final dan status revisi ke Agnes.",
+    "status": "done",
+    "createdAt": "2026-11-24T06:30:00.000Z",
+    "completedAt": "2026-11-24T06:30:05.000Z",
+    "result": "Siap, Bu Agnes! Instruksi revisi prioritas untuk konten #1795490268558 telah gue terima dan langsung gue eksekusi:\n\n1. **Koordinasi Tim Video (Victor & Gavin):** Fokus penuh pada 5 scene naskah video FB Reels (Night to Day Transformation). Visual model avatar dinonaktifkan dan diganti 100% foto produk fisik Navigate LED Flood Light 400W IP65 (8 Modul Chip COB, Aluminium Die-Cast).\n2. **Penahanan Distribusi (Shenny):** Jadwal publish postingan resmi ditahan sementara sampai video versi final disetujui Agnes.\n3. **Kesiapan Naskah & Copywriting (Charles):** Hook dan ad copy diselaraskan dengan standar spesifikasi resmi Navigate PT Feihong.\n\nStatus saat ini: Tim video sedang merender ulang video 5-scene otentik. Siap dikirimkan kembali ke Meja Agnes!"
+  },
+  {
     "id": "task-victor-led-400w",
     "fromId": "patrick",
     "fromName": "Patrick",

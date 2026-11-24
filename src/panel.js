@@ -113,8 +113,65 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
     if (agentId === 'agnes') {
       loadAgnesReviewCard();
     }
+    syncServerTasksForAgent(agentId);
     scrollDown(true);
     syncSend();
+  }
+
+  async function syncServerTasksForAgent(agentId) {
+    if (!agentId) return;
+    try {
+      const res = await fetch('/api/agent/tasks');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.tasks || !Array.isArray(data.tasks)) return;
+
+      const agentTasks = data.tasks.filter((t) => t.toId === agentId);
+      if (!agentTasks.length) return;
+
+      const currentHistory = getHistory(agentId);
+      let updated = false;
+      const newHistory = [...currentHistory];
+
+      for (const t of agentTasks) {
+        if (t.status === 'done' && t.result) {
+          const userPrompt = `[Tugas Delegasi dari ${t.fromName} (${t.fromRole || 'Rekan'})]:\n${t.task}`;
+          const alreadyExists = newHistory.some((m) => m.content === t.result || (m.role === 'user' && m.content === userPrompt));
+          if (!alreadyExists) {
+            newHistory.push({ role: 'user', content: userPrompt });
+            newHistory.push({ role: 'assistant', content: t.result });
+            updated = true;
+          }
+        }
+      }
+
+      if (updated) {
+        setHistory(agentId, newHistory);
+        if (currentId === agentId) {
+          els.messages.innerHTML = '';
+          for (const m of newHistory) {
+            els.messages.appendChild(m.role === 'user' ? bubble('user', '', { text: m.content }) : bubble('assistant', renderMarkdown(m.content)));
+          }
+          if (agentId === 'agnes') loadAgnesReviewCard();
+          scrollDown(true);
+        }
+      }
+
+      const workingTask = agentTasks.find((t) => t.status === 'working');
+      if (workingTask && currentId === agentId) {
+        const existWorking = els.messages.querySelector('.task-working-badge');
+        if (!existWorking) {
+          const badge = document.createElement('div');
+          badge.className = 'task-working-badge';
+          badge.style.cssText = 'margin:10px 0;padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:11.5px;color:#1e40af;';
+          badge.innerHTML = `⚡ <strong>Sedang memproses tugas dari ${workingTask.fromName}:</strong><br><em>"${workingTask.task}"</em>`;
+          els.messages.appendChild(badge);
+          scrollDown(true);
+        }
+      }
+    } catch (e) {
+      console.warn('[syncServerTasksForAgent error]', e);
+    }
   }
 
   async function loadAgnesReviewCard() {
