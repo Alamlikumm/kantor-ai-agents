@@ -15,9 +15,28 @@ if (!existsSync(videosDir)) {
 }
 
 // Cek ketersediaan FFmpeg di sistem
+export function getFFmpegBinary() {
+  const possibleDirs = [
+    '../node_modules/@remotion/compositor-win32-x64-msvc/ffmpeg.exe',
+    '../node_modules/@remotion/compositor-linux-x64-gnu/ffmpeg',
+    '../node_modules/@remotion/compositor-linux-x64-musl/ffmpeg',
+    '../node_modules/@remotion/compositor-darwin-x64/ffmpeg',
+    '../node_modules/@remotion/compositor-darwin-arm64/ffmpeg',
+  ];
+  for (const rel of possibleDirs) {
+    try {
+      const p = fileURLToPath(new URL(rel, import.meta.url));
+      if (existsSync(p)) return `"${p}"`;
+    } catch {}
+  }
+  return 'ffmpeg';
+}
+
 export async function isFFmpegInstalled() {
   try {
-    await execAsync('ffmpeg -version');
+    const bin = getFFmpegBinary();
+    if (bin !== 'ffmpeg') return true;
+    await execAsync(`${bin} -version`);
     return true;
   } catch {
     return false;
@@ -287,7 +306,8 @@ function cleanFfmpegText(str, maxLen = 50) {
     ? `-i "${finalAudioPath}"`
     : `-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100`;
 
-  const cmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "${filterGraph}" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart -t ${finalDuration} "${outputPath}"`;
+  const ffmpegBin = getFFmpegBinary();
+  const cmd = `${ffmpegBin} -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "${filterGraph}" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart -t ${finalDuration} "${outputPath}"`;
 
   try {
     console.log(`[video-renderer] Memulai render FFmpeg Multi-Scene Victor (Audio: ${hasVoiceover ? 'Ardi/Gadis Neural' : 'Mute'}, Durasi: ${finalDuration}s)...`);
@@ -297,8 +317,18 @@ function cleanFfmpegText(str, maxLen = 50) {
     } catch (primaryErr) {
       console.warn('[video-renderer] Multi-scene script gagal, mencoba fallback emergency render:', primaryErr.message);
       if (primaryErr.stderr) console.warn('[ffmpeg stderr]', primaryErr.stderr);
-      const emergencyCmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "drawbox=x=80:y=180:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawbox=x=80:y=1740:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=52:x=(w-text_w)/2:y=240,drawbox=x=80:y=480:w=920:h=780:color=0x0f172a@0.9:t=fill,drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=40:x=(w-text_w)/2:y=540,drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=32:x=(w-text_w)/2:y=640,drawbox=x=120:y=1400:w=840:h=130:color=0x16a34a@0.95:t=fill,drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=1445" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart -t ${finalDuration} "${outputPath}"`;
-      await execAsync(emergencyCmd);
+      try {
+        const emergencyCmd = `${ffmpegBin} -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "drawbox=x=80:y=180:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawbox=x=80:y=1740:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=52:x=(w-text_w)/2:y=240,drawbox=x=80:y=480:w=920:h=780:color=0x0f172a@0.9:t=fill,drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=40:x=(w-text_w)/2:y=540,drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=32:x=(w-text_w)/2:y=640,drawbox=x=120:y=1400:w=840:h=130:color=0x16a34a@0.95:t=fill,drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=1445" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart -t ${finalDuration} "${outputPath}"`;
+        await execAsync(emergencyCmd);
+      } catch (secErr) {
+        console.warn('[video-renderer] Emergency drawtext gagal, mencoba clean image+audio render...');
+        const isRaster = activeProductImage && /\.(jpe?g|png)$/i.test(activeProductImage) && existsSync(activeProductImage);
+        const imageFile = isRaster
+          ? activeProductImage
+          : fileURLToPath(new URL('./assets/model-indonesia-navigate.png', import.meta.url));
+        const stillCmd = `${ffmpegBin} -y -loop 1 -f image2 -vcodec mjpeg -i "${imageFile}" ${audioArgs} -c:v libx264 -tune stillimage -c:a aac -b:a 128k -pix_fmt yuv420p -shortest -movflags +faststart -t ${finalDuration} "${outputPath}"`;
+        await execAsync(stillCmd);
+      }
     }
 
     if (!existsSync(outputPath)) {

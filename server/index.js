@@ -1741,30 +1741,30 @@ function escapeHtml(str) {
 }
 
 // ---------- Static Videos & Frontend hasil build (produksi) ----------
-const videosDir = fileURLToPath(new URL('../dist/videos', import.meta.url));
-if (!existsSync(videosDir)) {
-  mkdirSync(videosDir, { recursive: true });
-}
-app.use('/videos', express.static(videosDir, {
+const distVideosDir = fileURLToPath(new URL('../dist/videos', import.meta.url));
+const publicVideosDir = fileURLToPath(new URL('../public/videos', import.meta.url));
+const videosDir = existsSync(distVideosDir) ? distVideosDir : publicVideosDir;
+if (!existsSync(distVideosDir)) mkdirSync(distVideosDir, { recursive: true });
+if (!existsSync(publicVideosDir)) mkdirSync(publicVideosDir, { recursive: true });
+
+const videoStaticOpts = {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.mp4')) {
       res.setHeader('Content-Type', 'video/mp4');
       res.setHeader('Accept-Ranges', 'bytes');
     }
   },
-}));
+};
+app.use('/videos', express.static(publicVideosDir, videoStaticOpts));
+app.use('/videos', express.static(distVideosDir, videoStaticOpts));
 
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 if (existsSync(dist)) {
   app.use(express.static(dist, {
     setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-      } else {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      }
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     },
   }));
   app.use((req, res, next) => {
@@ -1772,7 +1772,13 @@ if (existsSync(dist)) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.sendFile(`${dist}/index.html`);
+    try {
+      const html = readFileSync(`${dist}/index.html`, 'utf8');
+      const freshHtml = html.replace(/(src|href)="(\/assets\/[^"]+)"/g, `$1="$2?t=${Date.now()}"`);
+      res.type('html').send(freshHtml);
+    } catch {
+      res.sendFile(`${dist}/index.html`);
+    }
   });
 }
 

@@ -79,7 +79,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
     els.avatar.style.setProperty('--c', div.color);
     els.avatar.textContent = initials(agent.name);
     els.name.textContent = agent.name;
-    els.role.textContent = `${agent.role} · ${div.name}`;
+    els.role.textContent = agent.role === div.name ? agent.role : `${agent.role} · ${div.name}`;
 
     // rekan satu divisi
     els.mates.innerHTML = '';
@@ -164,11 +164,14 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
               <div style="font-size:11px;color:#64748b;">${post.topic || 'Lampu Navigate'} · ${post.platform || 'Instagram'}</div>
             </div>
           </div>
-          <span class="badge ${isApproved ? 'badge-approved' : 'badge-pending'}">${post.status}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge ${isApproved ? 'badge-approved' : 'badge-pending'}">${post.status}</span>
+            <button type="button" id="btn-close-review-card" style="border:none;background:transparent;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:2px 4px;" title="Tutup Card">✕</button>
+          </div>
         </div>
 
         <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);position:relative;">
-          <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${(post.post_url || '/videos/post-' + post.id + '.mp4') + '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id)}"></video>
+          <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:240px;display:block;object-fit:cover;" src="${(post.post_url || '/videos/post-' + post.id + '.mp4') + '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id)}"></video>
           <div id="video-error-placeholder" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,0.95);flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;color:#fff;">
             <span style="font-size:26px;margin-bottom:6px;">🎬</span>
             <strong style="font-size:12px;color:#facc15;margin-bottom:4px;">Video Belum Dirender di Server</strong>
@@ -176,31 +179,41 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           </div>
         </div>
 
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:-6px;margin-bottom:8px;">
+          <span style="font-size:11px;color:#16a34a;font-weight:600;">▶️ Video Siap Diputar</span>
+          <a href="${post.post_url || '/videos/post-' + post.id + '.mp4'}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:none;font-weight:600;">
+            🔗 Buka Video di Tab Baru (MP4)
+          </a>
+        </div>
+
+        <!-- Pratinjau Suara Voiceover Ardi -->
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;padding:6px 10px;border-radius:8px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <span style="font-size:11px;font-weight:700;color:#0369a1;">🎧 Suara Voiceover Ardi (Neural):</span>
+            <a href="/api/ugc/download-audio" download="suara-navigate-400w.mp3" style="font-size:10px;color:#0284c7;text-decoration:none;font-weight:600;">📥 Unduh MP3</a>
+          </div>
+          <audio controls src="/api/ugc/download-audio?stream=1" style="width:100%;height:28px;outline:none;"></audio>
+        </div>
+
         <!-- Tombol Render Video Otomatis 1-Klik -->
-        <div style="margin-bottom:12px;">
-          <button type="button" id="btn-render-video" style="width:100%;padding:10px 12px;background:#0284c7;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 4px rgba(2,132,199,0.25);">
-            ⚡ Buat / Render Video Otomatis (1-Klik)
+        <div style="margin-bottom:10px;">
+          <button type="button" id="btn-render-video" style="width:100%;padding:9px 12px;background:#0284c7;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 4px rgba(2,132,199,0.25);">
+            ⚡ Render Ulang Video Otomatis (1-Klik)
           </button>
           <div id="render-video-msg" style="display:none;font-size:11px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;padding:6px 10px;border-radius:6px;margin-top:6px;text-align:center;line-height:1.4;"></div>
         </div>
 
-        <div style="display:flex;justify-content:flex-end;margin-top:-6px;margin-bottom:8px;">
-          <a href="${post.post_url || '/videos/post-' + post.id + '.mp4'}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:none;font-weight:600;">
-            🔗 Buka Video di Tab Baru (MP4 Langsung)
-          </a>
-        </div>
-
-        <div style="font-size:12px;color:#334155;background:#f8fafc;padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line);line-height:1.5;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <strong style="color:#0f172a;font-size:12px;">📢 Naskah Iklan Facebook (Ad Copy):</strong>
-            <button type="button" id="btn-copy-adcopy" style="padding:4px 8px;font-size:11px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+        <div style="font-size:12px;color:#334155;background:#f8fafc;padding:10px;border-radius:10px;margin-bottom:8px;border:1px solid var(--line);line-height:1.4;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <strong style="color:#0f172a;font-size:11.5px;">📢 Naskah Iklan Facebook (Ad Copy):</strong>
+            <button type="button" id="btn-copy-adcopy" style="padding:3px 6px;font-size:10.5px;background:#e2e8f0;border:none;border-radius:5px;cursor:pointer;font-weight:600;">
               📋 Salin Naskah
             </button>
           </div>
-          <div style="max-height:110px;overflow-y:auto;white-space:pre-wrap;font-size:11.5px;color:#475569;background:#ffffff;padding:8px;border-radius:6px;border:1px solid #e2e8f0;">${(post.draft_nadia || post.final_content || '').trim()}</div>
+          <div style="max-height:80px;overflow-y:auto;white-space:pre-wrap;font-size:11px;color:#475569;background:#ffffff;padding:6px 8px;border-radius:6px;border:1px solid #e2e8f0;">${(post.draft_nadia || post.final_content || '').trim()}</div>
         </div>
 
-        <div style="font-size:11.5px;color:#475569;background:#f0fdf4;padding:8px 10px;border-radius:8px;margin-bottom:10px;border:1px solid #bbf7d0;">
+        <div style="font-size:11px;color:#475569;background:#f0fdf4;padding:6px 10px;border-radius:8px;margin-bottom:8px;border:1px solid #bbf7d0;">
           <b>Review Patrick:</b> ${(post.review_dewi || 'Konten siap dipublish').slice(0, 140)}...
         </div>
 
@@ -341,6 +354,10 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           }
         };
         reader.readAsDataURL(file);
+      });
+
+      card.querySelector('#btn-close-review-card')?.addEventListener('click', () => {
+        card.remove();
       });
 
       card.querySelector('#btn-copy-adcopy')?.addEventListener('click', (e) => {
