@@ -209,10 +209,10 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
             Gunakan <b>Hedra.com</b> untuk membuat video model berbicara realistis (seperti contoh TikTok) dengan 2 bahan ini:
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-            <a href="/videos/model-indonesia-navigate.png" download="model-navigate-400w.png" target="_blank" style="padding:6px 10px;background:#15803d;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+            <a href="/api/ugc/download-model" target="_blank" style="padding:6px 10px;background:#15803d;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
               📸 1. Unduh Foto Model
             </a>
-            <a href="/videos/audio-model-navigate-400w.mp3" download="suara-navigate-400w.mp3" target="_blank" style="padding:6px 10px;background:#0369a1;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+            <a href="/api/ugc/download-audio" target="_blank" style="padding:6px 10px;background:#0369a1;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
               🎙️ 2. Unduh Suara MP3
             </a>
             <a href="https://www.hedra.com" target="_blank" style="padding:6px 10px;background:#7e22ce;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">

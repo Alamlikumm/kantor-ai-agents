@@ -1059,7 +1059,52 @@ app.post('/api/pipeline/upload-video', async (req, res) => {
   }
 });
 
-// 4b3. Endpoint Bahan Siap Pakai untuk AI UGC Opsi A (Foto Model + Voiceover MP3)
+// 4b3. Endpoint Unduh Foto Model Langsung (Attachment)
+app.get('/api/ugc/download-model', (req, res) => {
+  try {
+    const distModel = `${videosDir}/model-indonesia-navigate.png`;
+    const assetModel = fileURLToPath(new URL('./assets/model-indonesia-navigate.png', import.meta.url));
+
+    let filePath = null;
+    if (existsSync(distModel)) filePath = distModel;
+    else if (existsSync(assetModel)) {
+      copyFileSync(assetModel, distModel);
+      filePath = distModel;
+    }
+
+    if (!filePath) {
+      return res.status(404).send('Foto model belum siap di server.');
+    }
+    res.download(filePath, 'model-navigate-400w.png');
+  } catch (err) {
+    res.status(500).send('Gagal mengunduh foto model: ' + err.message);
+  }
+});
+
+// 4b4. Endpoint Unduh Audio Voiceover Langsung (Attachment, auto-generate jika belum ada)
+app.get('/api/ugc/download-audio', async (req, res) => {
+  try {
+    const audioPath = `${videosDir}/audio-model-navigate-400w.mp3`;
+    const script = 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Ini Navigate 400 Watt dengan 8 Modul Chip COB, 40.000 lumens super terang, bodi kokoh aluminium die-cast dan tahan air badai IP65. Upgrade penerangan proyekmu bareng Navigate sekarang!';
+
+    if (!existsSync(audioPath)) {
+      await generateEdgeTTS({
+        text: script,
+        outputPath: audioPath,
+        voice: VOICES.ARDI,
+      });
+    }
+
+    if (!existsSync(audioPath)) {
+      return res.status(404).send('Audio voiceover sedang diproses atau gagal di-generate.');
+    }
+    res.download(audioPath, 'suara-navigate-400w.mp3');
+  } catch (err) {
+    res.status(500).send('Gagal mengunduh audio voiceover: ' + err.message);
+  }
+});
+
+// 4b5. Endpoint Metadata Bahan Siap Pakai untuk AI UGC Opsi A
 app.get('/api/ugc/materials', async (req, res) => {
   try {
     const assetModel = fileURLToPath(new URL('./assets/model-indonesia-navigate.png', import.meta.url));
@@ -1083,8 +1128,8 @@ app.get('/api/ugc/materials', async (req, res) => {
 
     res.json({
       success: true,
-      modelImageUrl: '/videos/model-indonesia-navigate.png',
-      audioUrl: existsSync(audioPath) ? '/videos/audio-model-navigate-400w.mp3' : null,
+      modelImageUrl: '/api/ugc/download-model',
+      audioUrl: '/api/ugc/download-audio',
       script,
       guide: 'Unggah modelImageUrl dan audioUrl ke hedra.com atau klingai.com untuk membuat video model berbicara realistis secara gratis!',
     });
@@ -1675,6 +1720,31 @@ if (existsSync(dist)) {
     res.sendFile(`${dist}/index.html`);
   });
 }
+
+// Inisialisasi otomatis aset UGC (Foto Model & Audio Voiceover) saat server booting
+async function initUgcAssets() {
+  try {
+    const assetModel = fileURLToPath(new URL('./assets/model-indonesia-navigate.png', import.meta.url));
+    const distModel = `${videosDir}/model-indonesia-navigate.png`;
+    if (existsSync(assetModel)) {
+      copyFileSync(assetModel, distModel);
+      console.log('[ugc-init] Foto model Navigate berhasil disalin ke dist/videos/');
+    }
+    const audioPath = `${videosDir}/audio-model-navigate-400w.mp3`;
+    if (!existsSync(audioPath)) {
+      const script = 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Ini Navigate 400 Watt dengan 8 Modul Chip COB, 40.000 lumens super terang, bodi kokoh aluminium die-cast dan tahan air badai IP65. Upgrade penerangan proyekmu bareng Navigate sekarang!';
+      await generateEdgeTTS({
+        text: script,
+        outputPath: audioPath,
+        voice: VOICES.ARDI,
+      });
+      console.log('[ugc-init] Audio voiceover MP3 berhasil di-generate di dist/videos/');
+    }
+  } catch (e) {
+    console.warn('[ugc-init warning]', e.message);
+  }
+}
+initUgcAssets();
 
 app.listen(PORT, () => {
   console.log(`Kantor AI API jalan di http://localhost:${PORT}`);
