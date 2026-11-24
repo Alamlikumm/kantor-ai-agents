@@ -538,21 +538,119 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
       card.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
           <div style="font-weight:700;color:#15803d;font-size:13px;display:flex;align-items:center;gap:6px;">
-            <span style="font-size:18px;">🎬</span> Studio Video Victor · Navigate 400W
+            <span style="font-size:18px;">🎬</span> Studio Produksi Video Victor · Pipeline n8n
           </div>
-          <span style="font-size:10.5px;background:#dcfce7;color:#166534;padding:3px 8px;border-radius:99px;font-weight:700;">Naskah 5-Scene Siap Render</span>
+          <span style="font-size:10.5px;background:#dcfce7;color:#166534;padding:3px 8px;border-radius:99px;font-weight:700;">Naskah 5-Scene Terverifikasi</span>
         </div>
         <p style="font-size:11.5px;color:#334155;margin:0 0 10px 0;line-height:1.45;">
-          Naskah storyboard 5-scene dan voiceover otentik di atas terhubung langsung ke mesin render FFmpeg & Edge-TTS. Klik tombol di bawah untuk langsung merender video vertikal 9:16 (durasi 25 detik) dengan foto produk otentik Navigate 400W & suara narasi bahasa Indonesia.
+          Naskah 5-scene dan prompt video AI di atas siap dieksekusi oleh <b>n8n (Kling AI / Runway)</b> untuk menghasilkan video gerak nyata (adegan semprot air badai, night to day, dan heatsink). Hasil video jadi akan otomatis masuk ke <b>Meja Review Agnes</b> untuk di-review sebelum diposting.
         </p>
-        <button type="button" id="btn-victor-render-direct" style="width:100%;padding:10px 14px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(22,163,74,0.3);">
-          ⚡ Render Video FB Reels (25 Detik) Sekarang
-        </button>
-        <div id="victor-render-status" style="display:none;font-size:11px;color:#15803d;background:#dcfce7;border:1px solid #86efac;padding:8px 10px;border-radius:6px;margin-top:8px;text-align:center;line-height:1.4;"></div>
-        <div id="victor-video-preview-wrap" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;background:#000;">
-          <video id="victor-video-player" controls playsinline style="width:100%;max-height:240px;display:block;object-fit:cover;"></video>
+
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button type="button" id="btn-victor-send-n8n" style="flex:1;padding:10px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(37,99,235,0.3);">
+            🚀 Kirim Naskah & 5-Scene Prompt ke n8n
+          </button>
+          <button type="button" id="btn-victor-copy-payload" style="padding:10px 12px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap;">
+            📋 Salin JSON n8n
+          </button>
         </div>
+
+        <div id="victor-n8n-status" style="display:none;font-size:11.5px;padding:8px 10px;border-radius:6px;margin-top:8px;line-height:1.45;"></div>
+
+        <details style="margin-top:10px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">
+          <summary style="font-size:11px;font-weight:700;color:#64748b;cursor:pointer;">
+            🛠️ Opsi Alternatif: Render Preview Lokal (FFmpeg Draft)
+          </summary>
+          <div style="margin-top:8px;">
+            <p style="font-size:11px;color:#64748b;margin:0 0 8px 0;">Hanya untuk draf kasar di browser lokal tanpa video gerak AI.</p>
+            <button type="button" id="btn-victor-render-direct" style="width:100%;padding:8px 12px;background:#64748b;color:#fff;border:none;border-radius:6px;font-weight:600;font-size:11px;cursor:pointer;">
+              Render Draft Cepat (FFmpeg)
+            </button>
+            <div id="victor-render-status" style="display:none;font-size:11px;color:#15803d;background:#dcfce7;border:1px solid #86efac;padding:8px 10px;border-radius:6px;margin-top:8px;text-align:center;line-height:1.4;"></div>
+            <div id="victor-video-preview-wrap" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;background:#000;">
+              <video id="victor-video-player" controls playsinline style="width:100%;max-height:240px;display:block;object-fit:cover;"></video>
+            </div>
+          </div>
+        </details>
       `;
+
+      const btnN8n = card.querySelector('#btn-victor-send-n8n');
+      const btnCopyPayload = card.querySelector('#btn-victor-copy-payload');
+      const n8nStatus = card.querySelector('#victor-n8n-status');
+      let cachedPayload = null;
+
+      btnN8n?.addEventListener('click', async () => {
+        btnN8n.disabled = true;
+        btnN8n.style.opacity = '0.7';
+        btnN8n.innerHTML = '⏳ Menyiapkan & Mengirim Prompt 5-Scene ke n8n...';
+        if (n8nStatus) {
+          n8nStatus.style.display = 'block';
+          n8nStatus.style.background = '#eff6ff';
+          n8nStatus.style.border = '1px solid #bfdbfe';
+          n8nStatus.style.color = '#1e40af';
+          n8nStatus.innerText = 'Mengemas 5 Scene Naskah + Prompt Kling AI/Runway + Voiceover ke n8n Webhook...';
+        }
+
+        try {
+          const res = await fetch('/api/pipeline/send-to-n8n', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-access-code': getCode() },
+            body: JSON.stringify({ postId }),
+          });
+          const d = await res.json();
+          cachedPayload = d.payload;
+          btnN8n.disabled = false;
+          btnN8n.style.opacity = '1';
+          btnN8n.style.background = '#059669';
+          btnN8n.innerHTML = '✅ Berhasil Dikirim ke n8n!';
+
+          if (n8nStatus) {
+            n8nStatus.style.background = '#f0fdf4';
+            n8nStatus.style.border = '1.5px solid #22c55e';
+            n8nStatus.style.color = '#15803d';
+            n8nStatus.innerHTML = `
+              <strong>🚀 Naskah & 5-Scene Prompt Video AI Berhasil Dikemas!</strong><br>
+              Status: <b>${d.webhookStatus}</b><br>
+              <span style="font-size:11px;color:#334155;">
+                AI Video Generator di n8n (Kling AI / Runway) sedang memproses adegan gerak (air semprot, saklar ON, heatsink). Setelah selesai, video otomatis muncul di <b>Meja Agnes</b> untuk ditinjau & di-approve!
+              </span>
+            `;
+          }
+        } catch (err) {
+          btnN8n.disabled = false;
+          btnN8n.style.opacity = '1';
+          btnN8n.style.background = '#dc2626';
+          btnN8n.innerHTML = '❌ Gagal Mengirim ke n8n';
+          if (n8nStatus) {
+            n8nStatus.style.background = '#fef2f2';
+            n8nStatus.style.border = '1px solid #fecaca';
+            n8nStatus.style.color = '#991b1b';
+            n8nStatus.innerText = err.message;
+          }
+        }
+      });
+
+      btnCopyPayload?.addEventListener('click', async () => {
+        try {
+          if (!cachedPayload) {
+            const res = await fetch('/api/pipeline/send-to-n8n', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-access-code': getCode() },
+              body: JSON.stringify({ postId }),
+            });
+            const d = await res.json();
+            cachedPayload = d.payload;
+          }
+          if (cachedPayload && navigator.clipboard) {
+            await navigator.clipboard.writeText(JSON.stringify(cachedPayload, null, 2));
+            btnCopyPayload.innerText = '✅ Tersalin!';
+            setTimeout(() => { btnCopyPayload.innerText = '📋 Salin JSON n8n'; }, 2000);
+          }
+        } catch {
+          btnCopyPayload.innerText = '❌ Gagal Salin';
+          setTimeout(() => { btnCopyPayload.innerText = '📋 Salin JSON n8n'; }, 2000);
+        }
+      });
 
       const btn = card.querySelector('#btn-victor-render-direct');
       const statusBox = card.querySelector('#victor-render-status');
@@ -562,10 +660,10 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
       btn?.addEventListener('click', async () => {
         btn.disabled = true;
         btn.style.opacity = '0.7';
-        btn.innerHTML = '⏳ Sedang Merender 5 Scene Video Navigate 400W... (~5-15 detik)';
+        btn.innerHTML = '⏳ Merender draft FFmpeg... (~5-15 detik)';
         if (statusBox) {
           statusBox.style.display = 'block';
-          statusBox.innerText = 'Menggabungkan 5 Scene Naskah + Foto Produk Navigate 400W + Voiceover Ardi Neural...';
+          statusBox.innerText = 'Menggabungkan aset draft lokal...';
         }
         try {
           const res = await fetch('/api/pipeline/render-video', {
@@ -578,9 +676,9 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
             btn.disabled = false;
             btn.style.opacity = '1';
             btn.style.background = '#059669';
-            btn.innerHTML = '✅ Video Berhasil Dibuat! (Klik untuk Render Ulang)';
+            btn.innerHTML = '✅ Draft Berhasil Dibuat!';
             if (statusBox) {
-              statusBox.innerText = `Selesai dalam ${(d.elapsedMs / 1000).toFixed(1)} detik! Video siap diputar di bawah dan sudah diperbarui di Meja Agnes.`;
+              statusBox.innerText = `Selesai dalam ${(d.elapsedMs / 1000).toFixed(1)}s! Siap diputar di bawah.`;
             }
             if (previewWrap && player) {
               previewWrap.style.display = 'block';
@@ -592,14 +690,14 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
             btn.disabled = false;
             btn.style.opacity = '1';
             btn.style.background = '#dc2626';
-            btn.innerHTML = '❌ Gagal Render. Coba Lagi';
+            btn.innerHTML = '❌ Gagal Render';
             if (statusBox) statusBox.innerText = d.error || 'Terjadi kesalahan saat merender.';
           }
         } catch (err) {
           btn.disabled = false;
           btn.style.opacity = '1';
           btn.style.background = '#dc2626';
-          btn.innerHTML = '❌ Gagal Render. Coba Lagi';
+          btn.innerHTML = '❌ Gagal Render';
           if (statusBox) statusBox.innerText = err.message;
         }
       });

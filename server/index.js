@@ -1080,8 +1080,15 @@ app.post('/api/pipeline/approve', requireAccess, async (req, res) => {
 });
 
 // 4b. Endpoint Tautkan Video Hasil Render (Dipanggil n8n / AI Video Renderer)
-app.post('/api/pipeline/attach-video', requireAccess, async (req, res) => {
+app.post('/api/pipeline/attach-video', async (req, res) => {
   try {
+    if (ACCESS_CODE) {
+      const passed = req.get('x-access-code') || req.body?.access_code || req.body?.accessCode || req.query?.access_code;
+      if (!safeEqual(passed || '', ACCESS_CODE)) {
+        return res.status(401).json({ success: false, error: 'Kode akses salah atau belum diisi.' });
+      }
+    }
+
     const { postId, videoUrl } = req.body;
     if (!postId || !videoUrl) {
       return res.status(400).json({ success: false, error: 'postId dan videoUrl wajib diisi.' });
@@ -1121,7 +1128,7 @@ app.post('/api/pipeline/attach-video', requireAccess, async (req, res) => {
     console.log(`[video-render] Video berhasil ditautkan ke Post #${postId}: ${videoUrl}`);
     res.json({
       success: true,
-      message: `Video untuk Post #${postId} berhasil ditautkan!`,
+      message: `Video untuk Post #${postId} berhasil ditautkan dan tampil di Meja Agnes!`,
       post: updatedPost,
     });
   } catch (err) {
@@ -1161,6 +1168,145 @@ app.post('/api/pipeline/upload-video', async (req, res) => {
   } catch (err) {
     console.error('[ugc upload error]', err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4d. Endpoint Kirim Naskah & 5-Scene Prompt Video AI ke n8n (Production Pipeline)
+app.post('/api/pipeline/send-to-n8n', async (req, res) => {
+  try {
+    const { postId = 1795490268558, customWebhookUrl = '' } = req.body;
+    let post = null;
+    try {
+      const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [Number(postId)]);
+      if (r.rows.length) post = r.rows[0];
+    } catch {}
+    if (!post) {
+      post = localPosts.find((p) => Number(p.id) === Number(postId)) || localPosts[0];
+    }
+
+    const victorData = findVictorScriptInTasks(post?.topic || '');
+    const webhookUrl = customWebhookUrl || process.env.N8N_VIDEO_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL || '';
+
+    const scenes = [
+      {
+        scene_number: 1,
+        time_seconds: "00:00 - 00:03",
+        scene_title: "Night to Day Transformation (Hook 0-3s)",
+        action_id: "Area outdoor lapangan proyek gelap gulita total, tangan menekan saklar industri, seketika lampu Navigate 400W menyala menerangi area 100 meter seperti siang hari.",
+        ai_video_prompt_en: "Cinematic vertical 9:16 video, pitch-black industrial construction site at night, human hand flips industrial power switch ON, instantly a powerful Navigate 400W LED flood light illuminates the entire 100-meter field into bright daylight, sharp clean lighting, realistic light beam cutting through darkness, 4k ultra-realistic.",
+        overlay_text: "⚡ NAVIGATE 400W: GELAP JADI SIANG! ⚡",
+        voiceover_line: "Lampu sorot biasa mati kutu di area seluas ini? Liat ini!"
+      },
+      {
+        scene_number: 2,
+        time_seconds: "00:03 - 00:09",
+        scene_title: "Extreme Durability Test IP65",
+        action_id: "Uji ketahanan ekstrem IP65, semprotan air bertekanan tinggi (High Pressure Washer) langsung menghantam kaca lampu Navigate 400W yang menyala terang tanpa rembesan atau konslet.",
+        ai_video_prompt_en: "Macro slow motion vertical 9:16 shot, high-pressure water washer spraying powerful water blasts directly onto operating Navigate industrial LED floodlight, water splashing violently, light stays 100% on, double silicone seal and tempered glass visible, IP65 extreme waterproof test, commercial product commercial, 4k.",
+        overlay_text: "💦 TEST WATERPROOF IP65 EKSTREM! 💦",
+        voiceover_line: "Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Disemprot air badai bertekanan tinggi? Sertifikasi IP65 memastikan nol bocor dan nol konslet!"
+      },
+      {
+        scene_number: 3,
+        time_seconds: "00:09 - 00:15",
+        scene_title: "Macro Detail 8 Modul Chip COB",
+        action_id: "Macro shot close-up barisan 8 Modul Chip COB Navigate dan lensa optik fokus cembung, menyorot 40.000 lumens dan efisiensi cahaya tinggi.",
+        ai_video_prompt_en: "Extreme macro camera zoom vertical 9:16 into array of 8 COB LED chip modules glowing intensely behind optical glass lenses, brilliant daylight 40,000 lumens, premium metallic finish, razor-sharp focus, cinematic commercial lighting, 4k.",
+        overlay_text: "💡 400 WATT · 8 MODUL CHIP COB",
+        voiceover_line: "Didukung 8 Modul Chip COB bertenaga 400 Watt, sorotannya padat, tajam, dan merata ke segala penjuru!"
+      },
+      {
+        scene_number: 4,
+        time_seconds: "00:15 - 00:20",
+        scene_title: "Bodi Aluminium Die-Cast & Heatsink Pendingin",
+        action_id: "Kamera berputar menyorot bodi aluminium die-cast tebal dan sirip heatsink pendingin di bagian belakang lampu.",
+        ai_video_prompt_en: "Cinematic vertical 9:16 orbit shot around rugged dark-gray aluminum die-cast housing of heavy-duty Navigate floodlight, focusing on dense cooling heatsink fins dissipating heat, industrial durability, studio lighting, 4k.",
+        overlay_text: "🔩 BODI FULL ALUMINIUM DIE-CAST & HEATSINK",
+        voiceover_line: "Bodi aluminium die-cast kokoh dengan heatsink sirip tebal untuk buang panas maksimal dan masa pakai panjang."
+      },
+      {
+        scene_number: 5,
+        time_seconds: "00:20 - 00:25",
+        scene_title: "Product Hero & Call To Action",
+        action_id: "Unit utuh Navigate 400W berdiri kokoh di bracket 180 derajat dengan outro logo Navigate dan tombol kontak WhatsApp sales resmi.",
+        ai_video_prompt_en: "Clean vertical 9:16 hero shot of Navigate 400W LED flood light on mounting bracket, elegant glowing rim light, professional commercial outro, WhatsApp order button graphics, 4k.",
+        overlay_text: "📲 Pesan & Konsultasi Sekarang! 👉 Klik [LINK WA]",
+        voiceover_line: "Dapatkan penawaran proyek sekarang. Klik link WhatsApp untuk hubungi sales resmi!"
+      }
+    ];
+
+    const host = req.get('host') || 'office.ptfeihong.com';
+    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const callbackUrl = `${protocol}://${host}/api/pipeline/attach-video`;
+
+    const n8nPayload = {
+      event: 'video_production_request',
+      postId: post?.id || Number(postId),
+      product_name: 'Navigate LED Flood Light 400W IP65 Outdoor',
+      target_platform: 'Facebook Reels & Instagram Reels (9:16)',
+      total_duration_seconds: 25,
+      hook: victorData?.hook || '⚡ NAVIGATE 400W: GELAP JADI SIANG! ⚡',
+      full_voiceover_script: victorData?.voiceover || 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Didukung 8 Modul Chip COB bertenaga 400 Watt, sorotannya padat, tajam, dan merata ke segala penjuru! Disemprot air badai bertekanan tinggi? Sertifikasi IP65 memastikan nol bocor dan nol konslet! Bodi aluminium die-cast kokoh dengan heatsink sirip tebal untuk buang panas maksimal. Dapatkan penawaran proyek sekarang. Hubungi tim sales kami untuk penawaran terbaik!',
+      facebook_ad_copy: post?.draft_nadia || post?.final_content || victorData?.adCopy || '',
+      verified_specs: [
+        'Daya: 400 Watt (8 Modul Chip COB)',
+        'Kecerahan: 40.000 Lumens Super Terang',
+        'Proteksi: IP65 Waterproof & Dustproof (Tahan Hujan Badai)',
+        'Bodi: Aluminium Die-Cast Tebal + Sirip Heatsink Dingin',
+        'Garansi Resmi: 2 Tahun PT Feihong Trading International'
+      ],
+      scenes,
+      callback_url: callbackUrl,
+      access_code: ACCESS_CODE || '',
+      instructions_for_n8n: `1. Generate 5 klip video memakai Kling AI / Runway Gen-3 menggunakan ai_video_prompt_en dari tiap scene.\n2. Generate audio voiceover via ElevenLabs / Edge-TTS dari full_voiceover_script.\n3. Gabungkan klip 1-5 + audio + overlay_text (format vertical 9:16).\n4. Kirim URL file MP4 hasil render kembali ke website via POST ${callbackUrl} dengan body { postId: ${post?.id || postId}, videoUrl: "<URL_MP4>" } agar muncul di Meja Agnes untuk di-review & approve sebelum diposting!`,
+      createdAt: new Date().toISOString()
+    };
+
+    const payloadFile = fileURLToPath(new URL('./n8n_latest_payload.json', import.meta.url));
+    writeFileSync(payloadFile, JSON.stringify(n8nPayload, null, 2), 'utf8');
+
+    let webhookSent = false;
+    let webhookStatus = 'saved_locally';
+
+    if (webhookUrl) {
+      try {
+        const fetchRes = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(n8nPayload),
+        });
+        webhookSent = fetchRes.ok;
+        webhookStatus = fetchRes.ok ? 'sent_to_n8n' : `webhook_failed_${fetchRes.status}`;
+      } catch (e) {
+        webhookStatus = `webhook_error: ${e.message}`;
+      }
+    }
+
+    console.log(`[send-to-n8n] Payload n8n untuk Post #${post?.id || postId} siap (Sent: ${webhookSent}, Status: ${webhookStatus})`);
+    res.json({
+      success: true,
+      webhookSent,
+      webhookStatus,
+      webhookUrl: webhookUrl || 'Tersimpan di server (Siap disalin / dihubungkan ke Webhook n8n)',
+      payload: n8nPayload,
+    });
+  } catch (err) {
+    console.error('[send-to-n8n error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint untuk mengambil JSON Payload n8n terakhir
+app.get('/api/pipeline/n8n-payload', (req, res) => {
+  try {
+    const payloadFile = fileURLToPath(new URL('./n8n_latest_payload.json', import.meta.url));
+    if (existsSync(payloadFile)) {
+      const data = JSON.parse(readFileSync(payloadFile, 'utf8'));
+      return res.json({ success: true, payload: data });
+    }
+    res.status(404).json({ success: false, error: 'Belum ada payload n8n yang tersimpan.' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
