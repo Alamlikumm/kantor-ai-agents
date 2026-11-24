@@ -113,12 +113,16 @@ export async function generateProductImage({ postId, topic = 'Navigate LED Flood
     if (res.ok) {
       const buffer = Buffer.from(await res.arrayBuffer());
       if (buffer && buffer.length > 5000) {
-        writeFileSync(outputPath, buffer);
-        console.log(`[gavin-visual] Foto produk AI berhasil diunduh (${(buffer.length / 1024).toFixed(0)} KB): ${publicUrl}`);
+        const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
+        const actualFileName = isJpeg ? `product-${postId || Date.now()}.jpg` : `product-${postId || Date.now()}.png`;
+        const actualOutputPath = `${videosDir}/${actualFileName}`;
+        const actualPublicUrl = `/videos/${actualFileName}`;
+        writeFileSync(actualOutputPath, buffer);
+        console.log(`[gavin-visual] Foto produk AI berhasil diunduh (${(buffer.length / 1024).toFixed(0)} KB): ${actualPublicUrl}`);
         return {
           success: true,
-          imagePath: outputPath,
-          publicUrl,
+          imagePath: actualOutputPath,
+          publicUrl: actualPublicUrl,
           engine: 'flux_ai',
         };
       }
