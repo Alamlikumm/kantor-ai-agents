@@ -167,9 +167,23 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           <span class="badge ${isApproved ? 'badge-approved' : 'badge-pending'}">${post.status}</span>
         </div>
 
-        <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);">
+        <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);position:relative;">
           <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${(post.post_url || '/videos/post-' + post.id + '.mp4') + '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id)}"></video>
+          <div id="video-error-placeholder" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,0.95);flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;color:#fff;">
+            <span style="font-size:26px;margin-bottom:6px;">🎬</span>
+            <strong style="font-size:12px;color:#facc15;margin-bottom:4px;">Video Belum Dirender di Server</strong>
+            <p style="font-size:11px;color:#cbd5e1;margin:0 0 10px 0;">Klik tombol biru di bawah untuk render video otomatis sekarang.</p>
+          </div>
         </div>
+
+        <!-- Tombol Render Video Otomatis 1-Klik -->
+        <div style="margin-bottom:12px;">
+          <button type="button" id="btn-render-video" style="width:100%;padding:10px 12px;background:#0284c7;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 4px rgba(2,132,199,0.25);">
+            ⚡ Buat / Render Video Otomatis (1-Klik)
+          </button>
+          <div id="render-video-msg" style="display:none;font-size:11px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;padding:6px 10px;border-radius:6px;margin-top:6px;text-align:center;line-height:1.4;"></div>
+        </div>
+
         <div style="display:flex;justify-content:flex-end;margin-top:-6px;margin-bottom:8px;">
           <a href="${post.post_url || '/videos/post-' + post.id + '.mp4'}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:none;font-weight:600;">
             🔗 Buka Video di Tab Baru (MP4 Langsung)
@@ -199,55 +213,108 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           </button>
         </div>
 
-        <!-- OPSI A: VIDEO AI UGC MODEL MANUSIA (HEDRA / KLING) -->
-        <div style="margin-top:12px;padding:12px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <strong style="font-size:12px;color:#166534;">🌟 Bahan Video AI UGC Model (Opsi A):</strong>
-            <span style="font-size:10px;background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;font-weight:700;">100% GRATIS</span>
-          </div>
-          <div style="font-size:11px;color:#14532d;line-height:1.4;margin-bottom:8px;">
-            Bikin video model Indonesia berbicara realistis (seperti contoh TikTok) dengan 2 bahan ini:
-          </div>
+        <!-- OPSI TAMBAHAN: VIDEO AI UGC MODEL MANUSIA (HEDRA / KLING) -->
+        <details style="margin-top:12px;background:#f8fafc;padding:10px;border-radius:10px;border:1px solid #e2e8f0;">
+          <summary style="font-size:11px;font-weight:700;color:#64748b;cursor:pointer;">
+            🛠️ Opsi Tambahan: Buat Talking Avatar di Hedra.com (Manual)
+          </summary>
+          <div style="margin-top:8px;">
+            <div style="font-size:11px;color:#475569;line-height:1.4;margin-bottom:8px;">
+              Jika ingin model berbicara realistis, unduh 2 bahan ini lalu unggah ke <b>Hedra.com</b>:
+            </div>
 
-          <!-- 1. Foto Model Pria Indonesia -->
-          <div style="display:flex;gap:10px;align-items:center;background:#fff;padding:8px;border-radius:8px;border:1px solid #dcfce7;margin-bottom:8px;">
-            <img src="/api/ugc/download-model?preview=1" alt="Model Navigate 400W" style="width:54px;height:54px;border-radius:6px;object-fit:cover;border:1px solid #86efac;flex-shrink:0;" />
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:2px;">1. Foto Model Pria Indonesia</div>
-              <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Model pria memegang Navigate 400W IP65</div>
-              <a href="/api/ugc/download-model" download="model-navigate-400w.png" style="padding:4px 8px;background:#15803d;color:#fff;border-radius:5px;font-size:10px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
-                📥 Unduh Foto PNG (51 KB)
+            <!-- 1. Foto Model Pria Indonesia -->
+            <div style="display:flex;gap:10px;align-items:center;background:#fff;padding:8px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px;">
+              <img src="/api/ugc/download-model?preview=1" alt="Model Navigate 400W" style="width:50px;height:50px;border-radius:6px;object-fit:cover;border:1px solid #cbd5e1;flex-shrink:0;" />
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:2px;">1. Foto Model Pria Indonesia</div>
+                <a href="/api/ugc/download-model" download="model-navigate-400w.png" style="padding:4px 8px;background:#15803d;color:#fff;border-radius:5px;font-size:10px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                  📥 Unduh Foto PNG (51 KB)
+                </a>
+              </div>
+            </div>
+
+            <!-- 2. Voiceover Suara Ardi (Neural) -->
+            <div style="background:#fff;padding:8px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:11px;font-weight:700;color:#0369a1;">2. Suara Voiceover Ardi (Neural)</span>
+                <a href="/api/ugc/download-audio" download="suara-navigate-400w.mp3" style="padding:4px 8px;background:#0284c7;color:#fff;border-radius:5px;font-size:10px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                  📥 Unduh MP3
+                </a>
+              </div>
+              <audio controls src="/api/ugc/download-audio?stream=1" style="width:100%;height:30px;outline:none;"></audio>
+            </div>
+
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              <a href="https://www.hedra.com" target="_blank" style="padding:6px 10px;background:#7e22ce;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                🌐 Buka Hedra.com (Gratis)
               </a>
             </div>
-          </div>
 
-          <!-- 2. Voiceover Suara Ardi (Neural) -->
-          <div style="background:#fff;padding:8px;border-radius:8px;border:1px solid #dcfce7;margin-bottom:8px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <span style="font-size:11px;font-weight:700;color:#0369a1;">2. Suara Voiceover Ardi (Neural)</span>
-              <a href="/api/ugc/download-audio" download="suara-navigate-400w.mp3" style="padding:4px 8px;background:#0284c7;color:#fff;border-radius:5px;font-size:10px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
-                📥 Unduh MP3
-              </a>
+            <div style="border-top:1px dashed #cbd5e1;padding-top:8px;margin-top:6px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:11px;color:#334155;">Punya video hasil Hedra?</span>
+              <label style="padding:5px 10px;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">
+                📤 Pasang Video ke Sini
+                <input type="file" id="input-upload-ugc" accept="video/mp4" style="display:none;" />
+              </label>
             </div>
-            <audio controls src="/api/ugc/download-audio?stream=1" style="width:100%;height:30px;outline:none;"></audio>
           </div>
-
-          <!-- 3. Langkah Selanjutnya -->
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-            <a href="https://www.hedra.com" target="_blank" style="padding:6px 10px;background:#7e22ce;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
-              🌐 3. Buka Hedra.com (Unggah Foto & Audio di sana)
-            </a>
-          </div>
-
-          <div style="border-top:1px dashed #86efac;padding-top:8px;margin-top:6px;display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:11px;color:#334155;">Selesai di Hedra? Pasang videonya:</span>
-            <label style="padding:5px 10px;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">
-              📤 Pasang Video ke Sini
-              <input type="file" id="input-upload-ugc" accept="video/mp4" style="display:none;" />
-            </label>
-          </div>
-        </div>
+        </details>
       `;
+
+      const videoPlayer = card.querySelector('#review-video-player');
+      const videoErrorPlaceholder = card.querySelector('#video-error-placeholder');
+      if (videoPlayer && videoErrorPlaceholder) {
+        videoPlayer.addEventListener('error', () => {
+          videoErrorPlaceholder.style.display = 'flex';
+        });
+      }
+
+      card.querySelector('#btn-render-video')?.addEventListener('click', async () => {
+        const btn = card.querySelector('#btn-render-video');
+        const msg = card.querySelector('#render-video-msg');
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.innerHTML = '⏳ Victor sedang merender video Multi-Scene... (~5-10 detik)';
+        if (msg) {
+          msg.style.display = 'block';
+          msg.innerText = 'Menggabungkan 5 Scene Naskah + Foto Produk + Suara Ardi Neural...';
+        }
+
+        try {
+          const res = await fetch('/api/pipeline/render-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-access-code': getCode() },
+            body: JSON.stringify({ postId: post.id, duration: 25 }),
+          });
+          const data = await res.json();
+          if (data.success && data.videoUrl) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.background = '#16a34a';
+            btn.innerHTML = '✅ Video Berhasil Dibuat! (Klik untuk Render Ulang)';
+            if (msg) msg.innerText = `Selesai dalam ${(data.elapsedMs / 1000).toFixed(1)} detik! Video siap diputar di atas.`;
+            if (videoPlayer) {
+              if (videoErrorPlaceholder) videoErrorPlaceholder.style.display = 'none';
+              videoPlayer.src = data.videoUrl + '?t=' + Date.now();
+              videoPlayer.load();
+              videoPlayer.play().catch(() => {});
+            }
+          } else {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.background = '#dc2626';
+            btn.innerHTML = '❌ Gagal Render. Coba Lagi';
+            if (msg) msg.innerText = data.error || 'Terjadi kesalahan saat merender.';
+          }
+        } catch (err) {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          btn.style.background = '#dc2626';
+          btn.innerHTML = '❌ Gagal Render. Coba Lagi';
+          if (msg) msg.innerText = err.message;
+        }
+      });
 
       card.querySelector('#input-upload-ugc')?.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];

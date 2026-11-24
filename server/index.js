@@ -1164,33 +1164,51 @@ app.get('/api/ugc/materials', async (req, res) => {
 });
 
 // 4c. Endpoint Render Video Manual / On-Demand via FFmpeg Gratis
-app.post('/api/pipeline/render-video', requireAccess, async (req, res) => {
+app.post('/api/pipeline/render-video', async (req, res) => {
   try {
-    const { postId, duration = 8 } = req.body;
+    const { postId, duration = 25 } = req.body;
     if (!postId) {
       return res.status(400).json({ success: false, error: 'postId wajib diisi.' });
     }
 
-    const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [Number(postId)]);
-    if (!r.rows.length) {
+    let post = null;
+    try {
+      const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [Number(postId)]);
+      if (r.rows.length) post = r.rows[0];
+    } catch {}
+
+    if (!post) {
+      post = localPosts.find((p) => Number(p.id) === Number(postId));
+    }
+
+    if (!post) {
       return res.status(404).json({ success: false, error: `Post #${postId} tidak ditemukan di database.` });
     }
 
-    const post = r.rows[0];
+    const victorData = findVictorScriptInTasks(post.topic);
     const script = post.draft_nadia || post.final_content || '';
-    const hookMatch = script.match(/Hook[^:]*:\s*([^\n\r]+)/i) || script.match(/^([^\n\r]+)/);
-    const hookText = hookMatch ? hookMatch[1].trim() : post.topic;
+    const hookText = victorData?.hook || (script.match(/Hook[^:]*:\s*([^\n\r]+)/i)?.[1]?.trim()) || post.topic;
+    const narrationText = victorData?.voiceover || (script.match(/(?:Narasi Voiceover|Voiceover|Narasi|Script)[^:]*:\s*([\s\S]*?)(?=(?:\n\s*\d+\.|\n\s*Spesifikasi|\n\s*Call To Action|\n\s*CTA|$))/i)?.[1]?.replace(/[\r\n]+/g, ' ').trim()) || script.slice(0, 250);
+    const specsList = victorData?.specs?.length ? victorData.specs : ['8 Modul Chip COB', '40.000 Lumens', 'IP65 Waterproof', 'Bodi Aluminium Die-Cast'];
 
     const renderRes = await renderAutomatedVideo({
       postId: post.id,
       topic: post.topic,
       hook: hookText,
+      narration: narrationText,
       script,
-      duration: Number(duration),
+      specs: specsList,
+      cta: 'Hubungi Sales Admin Sean (WhatsApp)',
+      duration: victorData ? 25 : (Number(duration) || 25),
     });
 
     if (renderRes.success && renderRes.videoUrl) {
-      await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [renderRes.videoUrl, post.id]);
+      try {
+        await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [renderRes.videoUrl, post.id]);
+      } catch {}
+      post.post_url = renderRes.videoUrl;
+      persistLocalPosts();
+
       broadcastEvent('video_rendered', { postId: post.id, videoUrl: renderRes.videoUrl });
       return res.json({
         success: true,

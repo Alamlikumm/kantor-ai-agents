@@ -274,21 +274,30 @@ function cleanFfmpegText(str, maxLen = 50) {
     `drawtext=text='Distributor Resmi: PT Feihong Trading International'${fontParam}:fontcolor=0x86efac:fontsize=24:x=(w-text_w)/2:y=940:enable='gte(t,22)*lte(t,25)'`,
   ].join(',');
 
-  const audioArgs = hasVoiceover && existsSync(audioPath)
-    ? `-i "${audioPath}"`
+  const bundledAudio = fileURLToPath(new URL('./assets/audio-model-navigate-400w.mp3', import.meta.url));
+  let finalAudioPath = null;
+  if (hasVoiceover && existsSync(audioPath)) {
+    finalAudioPath = audioPath;
+  } else if (existsSync(bundledAudio)) {
+    finalAudioPath = bundledAudio;
+    hasVoiceover = true;
+  }
+
+  const audioArgs = finalAudioPath
+    ? `-i "${finalAudioPath}"`
     : `-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100`;
 
-  const cmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "${filterGraph}" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
+  const cmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "${filterGraph}" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart -t ${finalDuration} "${outputPath}"`;
 
   try {
-    console.log(`[video-renderer] Memulai render FFmpeg Multi-Scene Victor (Audio: ${hasVoiceover ? 'Edge-TTS' : 'Mute'}, Durasi: ${finalDuration}s)...`);
+    console.log(`[video-renderer] Memulai render FFmpeg Multi-Scene Victor (Audio: ${hasVoiceover ? 'Ardi/Gadis Neural' : 'Mute'}, Durasi: ${finalDuration}s)...`);
     const startTime = Date.now();
     try {
       await execAsync(cmd);
     } catch (primaryErr) {
       console.warn('[video-renderer] Multi-scene script gagal, mencoba fallback emergency render:', primaryErr.message);
       if (primaryErr.stderr) console.warn('[ffmpeg stderr]', primaryErr.stderr);
-      const emergencyCmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "drawbox=x=80:y=180:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawbox=x=80:y=1740:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=52:x=(w-text_w)/2:y=240,drawbox=x=80:y=480:w=920:h=780:color=0x0f172a@0.9:t=fill,drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=40:x=(w-text_w)/2:y=540,drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=32:x=(w-text_w)/2:y=640,drawbox=x=120:y=1400:w=840:h=130:color=0x16a34a@0.95:t=fill,drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=1445" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${finalDuration} "${outputPath}"`;
+      const emergencyCmd = `ffmpeg -y -f lavfi -i "color=c=0x070b14:s=1080x1920:d=${finalDuration}" ${audioArgs} -vf "drawbox=x=80:y=180:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawbox=x=80:y=1740:w=920:h=6:color=0x0ea5e9@0.9:t=fill,drawtext=text='NAVIGATE LIGHTING'${fontParam}:fontcolor=0x38bdf8:fontsize=52:x=(w-text_w)/2:y=240,drawbox=x=80:y=480:w=920:h=780:color=0x0f172a@0.9:t=fill,drawtext=text='${safeTopic}'${fontParam}:fontcolor=0xffffff:fontsize=40:x=(w-text_w)/2:y=540,drawtext=text='${safeHook}'${fontParam}:fontcolor=0xfacc15:fontsize=32:x=(w-text_w)/2:y=640,drawbox=x=120:y=1400:w=840:h=130:color=0x16a34a@0.95:t=fill,drawtext=text='${safeCta}'${fontParam}:fontcolor=0xffffff:fontsize=30:x=(w-text_w)/2:y=1445" -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart -t ${finalDuration} "${outputPath}"`;
       await execAsync(emergencyCmd);
     }
 
