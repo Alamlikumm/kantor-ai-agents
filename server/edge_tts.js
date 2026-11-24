@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
-import { createWriteStream, existsSync, unlinkSync } from 'node:fs';
+import { createWriteStream, existsSync, unlinkSync, writeFileSync, copyFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
@@ -165,16 +166,65 @@ export async function generateEdgeTTS({ text, outputPath, voice = VOICES.GADIS }
     }
   }
 
-  // Opsi 2: Gunakan native WebSocket langsung ke Microsoft Edge TTS
+  // Opsi 2: Gunakan library npm `msedge-tts` jika terinstall
+  try {
+    const { MsEdgeTTS, OUTPUT_FORMAT } = await import('msedge-tts');
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const tempDir = dirname(outputPath);
+    const ttsRes = await tts.toFile(tempDir, cleanText);
+    if (ttsRes && ttsRes.audioFilePath && existsSync(ttsRes.audioFilePath)) {
+      if (ttsRes.audioFilePath !== outputPath) {
+        copyFileSync(ttsRes.audioFilePath, outputPath);
+        try { unlinkSync(ttsRes.audioFilePath); } catch {}
+      }
+      return { success: true, audioPath: outputPath, voice, method: 'msedge-tts' };
+    }
+  } catch (msErr) {
+    console.warn('[msedge-tts warning, beralih ke native websocket/google]', msErr.message);
+  }
+
+  // Opsi 3: Gunakan native WebSocket langsung ke Microsoft Edge TTS
   try {
     console.log(`[edge-tts] Mensintesis audio via native WebSocket (Voice: ${voice})...`);
     const res = await synthesizeViaWebSocket({ text: cleanText, outputPath, voice });
     return { ...res, method: 'websocket' };
   } catch (wsErr) {
-    console.error('[edge-tts websocket error]', wsErr.message);
-    return {
-      success: false,
-      error: `Gagal sintesis Edge-TTS: ${wsErr.message}. Pasang python CLI: pip install edge-tts`,
-    };
+    console.warn('[edge-tts websocket error, beralih ke google fallback]', wsErr.message);
   }
+
+  // Opsi 4: Fallback Google TTS (Zero Dependency, HTTP GET)
+  try {
+    console.log('[edge-tts] Menggunakan fallback Google Translate TTS...');
+    const words = cleanText.split(' ');
+    const chunks = [];
+    let current = '';
+    for (const w of words) {
+      if ((current + ' ' + w).length > 150) {
+        if (current) chunks.push(current.trim());
+        current = w;
+      } else {
+        current = current ? current + ' ' + w : w;
+      }
+    }
+    if (current) chunks.push(current.trim());
+
+    const buffers = [];
+    for (const chunk of chunks) {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=id&client=tw-ob`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!res.ok) throw new Error(`Google TTS status: ${res.status}`);
+      const ab = await res.arrayBuffer();
+      buffers.push(Buffer.from(ab));
+    }
+    writeFileSync(outputPath, Buffer.concat(buffers));
+    return { success: true, audioPath: outputPath, voice: 'id-Google', method: 'google-tts' };
+  } catch (googleErr) {
+    console.error('[google tts fallback error]', googleErr.message);
+  }
+
+  return {
+    success: false,
+    error: 'Semua metode TTS gagal. Jalankan: pip install edge-tts di server VPS.',
+  };
 }

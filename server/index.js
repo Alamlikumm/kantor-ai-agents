@@ -1059,21 +1059,28 @@ app.post('/api/pipeline/upload-video', async (req, res) => {
   }
 });
 
-// 4b3. Endpoint Unduh Foto Model Langsung (Attachment)
+// 4b3. Endpoint Unduh Foto Model Langsung (Attachment / Preview)
 app.get('/api/ugc/download-model', (req, res) => {
   try {
     const distModel = `${videosDir}/model-indonesia-navigate.png`;
     const assetModel = fileURLToPath(new URL('./assets/model-indonesia-navigate.png', import.meta.url));
 
     let filePath = null;
-    if (existsSync(distModel)) filePath = distModel;
-    else if (existsSync(assetModel)) {
+    if (existsSync(distModel)) {
+      filePath = distModel;
+    } else if (existsSync(assetModel)) {
+      if (!existsSync(videosDir)) mkdirSync(videosDir, { recursive: true });
       copyFileSync(assetModel, distModel);
       filePath = distModel;
     }
 
-    if (!filePath) {
+    if (!filePath || !existsSync(filePath)) {
       return res.status(404).send('Foto model belum siap di server.');
+    }
+
+    if (req.query.preview === '1') {
+      res.setHeader('Content-Type', 'image/png');
+      return res.sendFile(filePath);
     }
     res.download(filePath, 'model-navigate-400w.png');
   } catch (err) {
@@ -1081,24 +1088,41 @@ app.get('/api/ugc/download-model', (req, res) => {
   }
 });
 
-// 4b4. Endpoint Unduh Audio Voiceover Langsung (Attachment, auto-generate jika belum ada)
+// 4b4. Endpoint Unduh Audio Voiceover Langsung (Attachment / Streaming)
 app.get('/api/ugc/download-audio', async (req, res) => {
   try {
-    const audioPath = `${videosDir}/audio-model-navigate-400w.mp3`;
-    const script = 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Ini Navigate 400 Watt dengan 8 Modul Chip COB, 40.000 lumens super terang, bodi kokoh aluminium die-cast dan tahan air badai IP65. Upgrade penerangan proyekmu bareng Navigate sekarang!';
+    const distAudio = `${videosDir}/audio-model-navigate-400w.mp3`;
+    const assetAudio = fileURLToPath(new URL('./assets/audio-model-navigate-400w.mp3', import.meta.url));
 
-    if (!existsSync(audioPath)) {
+    let filePath = null;
+    if (existsSync(distAudio)) {
+      filePath = distAudio;
+    } else if (existsSync(assetAudio)) {
+      if (!existsSync(videosDir)) mkdirSync(videosDir, { recursive: true });
+      copyFileSync(assetAudio, distAudio);
+      filePath = distAudio;
+    }
+
+    if (!filePath || !existsSync(filePath)) {
+      const script = 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Ini Navigate 400 Watt dengan 8 Modul Chip COB, 40.000 lumens super terang, bodi kokoh aluminium die-cast dan tahan air badai IP65. Upgrade penerangan proyekmu bareng Navigate sekarang!';
+      if (!existsSync(videosDir)) mkdirSync(videosDir, { recursive: true });
       await generateEdgeTTS({
         text: script,
-        outputPath: audioPath,
+        outputPath: distAudio,
         voice: VOICES.ARDI,
       });
+      if (existsSync(distAudio)) filePath = distAudio;
     }
 
-    if (!existsSync(audioPath)) {
+    if (!filePath || !existsSync(filePath)) {
       return res.status(404).send('Audio voiceover sedang diproses atau gagal di-generate.');
     }
-    res.download(audioPath, 'suara-navigate-400w.mp3');
+
+    if (req.query.stream === '1') {
+      res.setHeader('Content-Type', 'audio/mpeg');
+      return res.sendFile(filePath);
+    }
+    res.download(filePath, 'suara-navigate-400w.mp3');
   } catch (err) {
     res.status(500).send('Gagal mengunduh audio voiceover: ' + err.message);
   }
@@ -1724,18 +1748,25 @@ if (existsSync(dist)) {
 // Inisialisasi otomatis aset UGC (Foto Model & Audio Voiceover) saat server booting
 async function initUgcAssets() {
   try {
+    if (!existsSync(videosDir)) {
+      mkdirSync(videosDir, { recursive: true });
+    }
     const assetModel = fileURLToPath(new URL('./assets/model-indonesia-navigate.png', import.meta.url));
     const distModel = `${videosDir}/model-indonesia-navigate.png`;
     if (existsSync(assetModel)) {
       copyFileSync(assetModel, distModel);
       console.log('[ugc-init] Foto model Navigate berhasil disalin ke dist/videos/');
     }
-    const audioPath = `${videosDir}/audio-model-navigate-400w.mp3`;
-    if (!existsSync(audioPath)) {
+    const assetAudio = fileURLToPath(new URL('./assets/audio-model-navigate-400w.mp3', import.meta.url));
+    const distAudio = `${videosDir}/audio-model-navigate-400w.mp3`;
+    if (existsSync(assetAudio)) {
+      copyFileSync(assetAudio, distAudio);
+      console.log('[ugc-init] Audio voiceover MP3 berhasil disalin dari assets ke dist/videos/');
+    } else if (!existsSync(distAudio)) {
       const script = 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Ini Navigate 400 Watt dengan 8 Modul Chip COB, 40.000 lumens super terang, bodi kokoh aluminium die-cast dan tahan air badai IP65. Upgrade penerangan proyekmu bareng Navigate sekarang!';
       await generateEdgeTTS({
         text: script,
-        outputPath: audioPath,
+        outputPath: distAudio,
         voice: VOICES.ARDI,
       });
       console.log('[ugc-init] Audio voiceover MP3 berhasil di-generate di dist/videos/');

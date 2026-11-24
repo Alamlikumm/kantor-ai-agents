@@ -201,26 +201,46 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
 
         <!-- OPSI A: VIDEO AI UGC MODEL MANUSIA (HEDRA / KLING) -->
         <div style="margin-top:12px;padding:12px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <strong style="font-size:12px;color:#166534;">🌟 Uji Coba Video AI UGC Model Manusia (Opsi A):</strong>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:12px;color:#166534;">🌟 Bahan Video AI UGC Model (Opsi A):</strong>
             <span style="font-size:10px;background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;font-weight:700;">100% GRATIS</span>
           </div>
           <div style="font-size:11px;color:#14532d;line-height:1.4;margin-bottom:8px;">
-            Gunakan <b>Hedra.com</b> untuk membuat video model berbicara realistis (seperti contoh TikTok) dengan 2 bahan ini:
+            Bikin video model Indonesia berbicara realistis (seperti contoh TikTok) dengan 2 bahan ini:
           </div>
+
+          <!-- 1. Foto Model Pria Indonesia -->
+          <div style="display:flex;gap:10px;align-items:center;background:#fff;padding:8px;border-radius:8px;border:1px solid #dcfce7;margin-bottom:8px;">
+            <img src="/api/ugc/download-model?preview=1" alt="Model Navigate 400W" style="width:54px;height:54px;border-radius:6px;object-fit:cover;border:1px solid #86efac;flex-shrink:0;" />
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:2px;">1. Foto Model Pria Indonesia</div>
+              <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Model pria memegang Navigate 400W IP65</div>
+              <a href="/api/ugc/download-model" download="model-navigate-400w.png" style="padding:4px 8px;background:#15803d;color:#fff;border-radius:5px;font-size:10px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                📥 Unduh Foto PNG (51 KB)
+              </a>
+            </div>
+          </div>
+
+          <!-- 2. Voiceover Suara Ardi (Neural) -->
+          <div style="background:#fff;padding:8px;border-radius:8px;border:1px solid #dcfce7;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:700;color:#0369a1;">2. Suara Voiceover Ardi (Neural)</span>
+              <a href="/api/ugc/download-audio" download="suara-navigate-400w.mp3" style="padding:4px 8px;background:#0284c7;color:#fff;border-radius:5px;font-size:10px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                📥 Unduh MP3
+              </a>
+            </div>
+            <audio controls src="/api/ugc/download-audio?stream=1" style="width:100%;height:30px;outline:none;"></audio>
+          </div>
+
+          <!-- 3. Langkah Selanjutnya -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-            <a href="/api/ugc/download-model" target="_blank" style="padding:6px 10px;background:#15803d;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
-              📸 1. Unduh Foto Model
-            </a>
-            <a href="/api/ugc/download-audio" target="_blank" style="padding:6px 10px;background:#0369a1;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
-              🎙️ 2. Unduh Suara MP3
-            </a>
             <a href="https://www.hedra.com" target="_blank" style="padding:6px 10px;background:#7e22ce;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
-              🌐 3. Buka Hedra.com
+              🌐 3. Buka Hedra.com (Unggah Foto & Audio di sana)
             </a>
           </div>
+
           <div style="border-top:1px dashed #86efac;padding-top:8px;margin-top:6px;display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:11px;color:#334155;">Punya video hasil Hedra/Kling?</span>
+            <span style="font-size:11px;color:#334155;">Selesai di Hedra? Pasang videonya:</span>
             <label style="padding:5px 10px;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">
               📤 Pasang Video ke Sini
               <input type="file" id="input-upload-ugc" accept="video/mp4" style="display:none;" />
