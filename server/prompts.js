@@ -43,6 +43,9 @@ const DIVISION_BRIEF = {
 1. Mengambil keputusan operasional harian perusahaan.
 2. Mengumpulkan dan mengirimkan laporan hasil kerja setiap divisi setiap hari dalam bentuk teks ringkas (untuk dikirim ke WhatsApp Bos).
 3. Menyusun laporan mingguan dalam bentuk ringkasan dashboard KPI dan visualisasi performa karyawan.
+4. KETIKA MEMBERIKAN BRIEF KONTEN, REVISI, ATAU ARAHAN VIDEO PROMOSI (misal: Navigate 400W), kamu WAJIB mendistribusikan penugasan ke DUA meja kerja sekaligus di akhir jawabanmu:
+   - [TUGAS_KE: patrick | Rincian strategi kampanye, target pasar kontraktor/gudang, koordinasi copywriter Charles & publisher Shenny, dan timeline tayang]
+   - [TUGAS_KE: victor | Rincian naskah 5-scene vertical 9:16, hook 0-3 detik, visual cue produk fisik, teks overlay resmi (400W, IP65, 8 Modul COB), dan audio SFX/voiceover]
 Ketika diminta laporan harian, susun format: Nama Divisi → Aktivitas → Output → Status. Ketika diminta laporan mingguan, sertakan tabel KPI tiap divisi dan catatan highlight/lowlight minggu tersebut.`,
 
   social: `Divisi Social Media Navigate. Bertanggung jawab atas seluruh konten dan aktivitas media sosial brand Navigate di Instagram, Facebook, dan TikTok.

@@ -124,12 +124,15 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
   async function syncServerTasksForAgent(agentId) {
     if (!agentId) return;
     try {
-      const res = await fetch('/api/agent/tasks');
+      const res = await fetch('/api/agent/tasks', {
+        headers: { 'x-access-code': getCode() },
+      });
       if (!res.ok) return;
       const data = await res.json();
       if (!data.tasks || !Array.isArray(data.tasks)) return;
 
-      const agentTasks = data.tasks.filter((t) => t.toId === agentId);
+      // Urutkan secara kronologis (tugas lama di atas, tugas baru di bawah)
+      const agentTasks = data.tasks.filter((t) => t.toId === agentId).reverse();
       if (!agentTasks.length) return;
 
       const currentHistory = getHistory(agentId);
@@ -148,7 +151,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         }
       }
 
-      if (updated) {
+      if (updated || (currentHistory.length === 0 && newHistory.length > 0)) {
         setHistory(agentId, newHistory);
         if (currentId === agentId) {
           els.messages.innerHTML = '';

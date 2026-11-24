@@ -284,15 +284,18 @@ $('gate-form').addEventListener('submit', async (e) => {
 
   async function fetchServerTasks() {
     try {
-      const res = await fetch('/api/agent/tasks');
+      const res = await fetch('/api/agent/tasks', {
+        headers: { 'x-access-code': getCode() },
+      });
       if (!res.ok) return;
       const data = await res.json();
       if (data.tasks && data.tasks.length > 0) {
-        for (const t of data.tasks) {
+        const chronological = [...data.tasks].reverse();
+        for (const t of chronological) {
           if (t.status === 'done' && t.result) {
             const h = getHistory(t.toId);
             const userPrompt = `[Tugas Delegasi dari ${t.fromName} (${t.fromRole || 'Rekan'})]:\n${t.task}`;
-            if (!h.some((m) => m.content === t.result)) {
+            if (!h.some((m) => m.content === t.result || (m.role === 'user' && m.content === userPrompt))) {
               setHistory(t.toId, [
                 ...h,
                 { role: 'user', content: userPrompt },

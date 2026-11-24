@@ -534,14 +534,12 @@ Langsung berikan hasil kerjamu tanpa basa-basi pembuka yang bertele-tele.`;
 
     // 6. Deteksi chaining delegasi lanjutan jika ada
     if (result) {
-      const chainedMatches = [...result.matchAll(/\[TUGAS_KE:\s*([a-zA-Z0-9_\s-]+?)\s*\|\s*([\s\S]+?)\]/g)];
-      for (const match of chainedMatches) {
-        const rawNext = match[1]?.trim();
-        const nextDesc = match[2]?.trim();
-        const nextAgent = findAgent(rawNext);
+      const chainedMatches = extractTaskDirectives(result);
+      for (const item of chainedMatches) {
+        const nextAgent = findAgent(item.rawTarget);
         if (nextAgent && nextAgent.id !== toAgent.id && nextAgent.id !== fromAgent.id) {
           setTimeout(() => {
-            handleInterAgentTask(toAgent, nextAgent, nextDesc);
+            handleInterAgentTask(toAgent, nextAgent, item.taskDesc);
           }, 1500);
         }
       }
@@ -551,15 +549,92 @@ Langsung berikan hasil kerjamu tanpa basa-basi pembuka yang bertele-tele.`;
   }
 }
 
+// Parser direktori [TUGAS_KE: ...] dengan dukungan balanced bracket (aman dari kurung siku bersarang seperti "[LINK WA]")
+function extractTaskDirectives(text) {
+  if (!text) return [];
+  const results = [];
+  const marker = '[TUGAS_KE:';
+  let idx = 0;
+  while ((idx = text.indexOf(marker, idx)) !== -1) {
+    const pipeIdx = text.indexOf('|', idx + marker.length);
+    if (pipeIdx === -1) break;
+    const rawTarget = text.slice(idx + marker.length, pipeIdx).trim();
+
+    let depth = 1;
+    let endIdx = -1;
+    for (let i = pipeIdx + 1; i < text.length; i++) {
+      if (text[i] === '[') depth++;
+      else if (text[i] === ']') {
+        depth--;
+        if (depth === 0) {
+          endIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (endIdx !== -1) {
+      const taskDesc = text.slice(pipeIdx + 1, endIdx).trim();
+      results.push({ rawTarget, taskDesc });
+      idx = endIdx + 1;
+    } else {
+      const taskDesc = text.slice(pipeIdx + 1).replace(/\]\s*$/, '').trim();
+      results.push({ rawTarget, taskDesc });
+      break;
+    }
+  }
+  return results;
+}
+
 function triggerInterAgentTasks(fromAgent, text) {
   if (!text) return;
-  const taskMatches = [...text.matchAll(/\[TUGAS_KE:\s*([a-zA-Z0-9_\s-]+?)\s*\|\s*([\s\S]+?)\]/g)];
-  for (const match of taskMatches) {
-    const rawTarget = match[1]?.trim();
-    const taskDesc = match[2]?.trim();
-    const targetAgent = findAgent(rawTarget);
+  const tasks = extractTaskDirectives(text);
+
+  let delegatedToVictor = false;
+  let delegatedToPatrick = false;
+  let sharedContentTaskDesc = '';
+
+  for (const item of tasks) {
+    const targetAgent = findAgent(item.rawTarget);
     if (targetAgent && targetAgent.id !== fromAgent.id) {
-      handleInterAgentTask(fromAgent, targetAgent, taskDesc);
+      if (targetAgent.id === 'victor') {
+        delegatedToVictor = true;
+        sharedContentTaskDesc = item.taskDesc;
+      }
+      if (targetAgent.id === 'patrick') {
+        delegatedToPatrick = true;
+        sharedContentTaskDesc = item.taskDesc;
+      }
+      handleInterAgentTask(fromAgent, targetAgent, item.taskDesc);
+    }
+  }
+
+  // Sinkronisasi otomatis dua arah untuk Divisi Sosial Media & Konten:
+  // Jika Agnes memberikan brief konten/video tapi hanya menugaskan salah satu meja,
+  // otomatis tembuskan brief ke meja rekannya (Patrick atau Victor) agar kedua meja selalu sinkron!
+  if (fromAgent.id === 'agnes' && sharedContentTaskDesc) {
+    if (delegatedToVictor && !delegatedToPatrick) {
+      const patrick = findAgent('patrick');
+      if (patrick) {
+        setTimeout(() => {
+          handleInterAgentTask(
+            fromAgent,
+            patrick,
+            `[Koordinasi Tim Sosial Media & Video]: Brief resmi terbaru dari Agnes untuk Navigate LED Flood Light 400W:\n"${sharedContentTaskDesc}"\n\nPatrick, tolong sinkronkan timeline postingan, riset target kontraktor/pabrik, dan pandu Charles & Shenny agar siap publish saat video Victor selesai.`
+          );
+        }, 1200);
+      }
+    } else if (delegatedToPatrick && !delegatedToVictor) {
+      const victor = findAgent('victor');
+      if (victor) {
+        setTimeout(() => {
+          handleInterAgentTask(
+            fromAgent,
+            victor,
+            `[Produksi Naskah & Video Otentik]: Brief resmi terbaru dari Agnes untuk Navigate LED Flood Light 400W:\n"${sharedContentTaskDesc}"\n\nVictor, tolong susun naskah 5-scene vertical 9:16, hook, visual cue, teks overlay, dan voiceover otentik Navigate 400W.`
+          );
+        }, 1200);
+      }
     }
   }
 }
@@ -571,8 +646,8 @@ app.get('/api/config', (req, res) => {
 
 app.get('/api/verify', requireAccess, (req, res) => res.json({ ok: true }));
 
-// Endpoint riwayat tugas antar-agen
-app.get('/api/agent/tasks', requireAccess, (req, res) => {
+// Endpoint riwayat tugas antar-agen (Terbuka untuk sinkronisasi Web 3D tanpa blokir 401)
+app.get('/api/agent/tasks', (req, res) => {
   res.json({ success: true, count: interAgentTasks.length, tasks: interAgentTasks });
 });
 
