@@ -4,12 +4,13 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import pg from 'pg';
 import { timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { agentById, AGENTS } from '../shared/roster.js';
 import { buildSystemPrompt } from './prompts.js';
 import { renderAutomatedVideo, isFFmpegInstalled } from './video_renderer.js';
 import { generateProductImage } from './image_generator.js';
+import { generateEdgeTTS, VOICES } from './edge_tts.js';
 
 const { Pool } = pg;
 
@@ -84,7 +85,8 @@ const DEMO = !openaiClient && !anthropicClient;
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '100kb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ---------- Pembatas: akses, rate limit per IP, batas harian ----------
 function safeEqual(a, b) {
@@ -1019,6 +1021,75 @@ app.post('/api/pipeline/attach-video', requireAccess, async (req, res) => {
     });
   } catch (err) {
     console.error('[attach video error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4b2. Endpoint Upload Video AI UGC Langsung (MP4 dari Hedra / Kling / CapCut)
+app.post('/api/pipeline/upload-video', async (req, res) => {
+  try {
+    const { postId, videoBase64 } = req.body;
+    if (!postId || !videoBase64) {
+      return res.status(400).json({ success: false, error: 'postId dan videoBase64 wajib diisi.' });
+    }
+    const cleanFileName = `ugc-${postId}-${Date.now()}.mp4`;
+    const outPath = `${videosDir}/${cleanFileName}`;
+    const base64Data = videoBase64.replace(/^data:video\/[a-zA-Z0-9.-]+;base64,/, '');
+    writeFileSync(outPath, Buffer.from(base64Data, 'base64'));
+    const videoUrl = `/videos/${cleanFileName}`;
+
+    try {
+      await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [videoUrl, Number(postId)]);
+    } catch {}
+
+    const local = localPosts.find((p) => Number(p.id) === Number(postId));
+    if (local) {
+      local.post_url = videoUrl;
+      local.updated_at = new Date().toISOString();
+      persistLocalPosts();
+    }
+
+    broadcastEvent('video_rendered', { postId: Number(postId), videoUrl, engine: 'hedra_ugc' });
+    console.log(`[ugc-upload] Video AI UGC berhasil diunggah untuk Post #${postId}: ${videoUrl}`);
+
+    res.json({ success: true, videoUrl, message: 'Video AI UGC berhasil diunggah dan ditautkan!' });
+  } catch (err) {
+    console.error('[ugc upload error]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4b3. Endpoint Bahan Siap Pakai untuk AI UGC Opsi A (Foto Model + Voiceover MP3)
+app.get('/api/ugc/materials', async (req, res) => {
+  try {
+    const assetModel = fileURLToPath(new URL('./assets/model-indonesia-navigate.png', import.meta.url));
+    const distModel = `${videosDir}/model-indonesia-navigate.png`;
+    if (existsSync(assetModel) && !existsSync(distModel)) {
+      copyFileSync(assetModel, distModel);
+    }
+
+    const audioPath = `${videosDir}/audio-model-navigate-400w.mp3`;
+    const script = 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Ini Navigate 400 Watt dengan 8 Modul Chip COB, 40.000 lumens super terang, bodi kokoh aluminium die-cast dan tahan air badai IP65. Upgrade penerangan proyekmu bareng Navigate sekarang!';
+
+    if (!existsSync(audioPath)) {
+      try {
+        await generateEdgeTTS({
+          text: script,
+          outputPath: audioPath,
+          voice: VOICES.ARDI,
+        });
+      } catch {}
+    }
+
+    res.json({
+      success: true,
+      modelImageUrl: '/videos/model-indonesia-navigate.png',
+      audioUrl: existsSync(audioPath) ? '/videos/audio-model-navigate-400w.mp3' : null,
+      script,
+      guide: 'Unggah modelImageUrl dan audioUrl ke hedra.com atau klingai.com untuk membuat video model berbicara realistis secara gratis!',
+    });
+  } catch (err) {
+    console.error('[ugc materials error]', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

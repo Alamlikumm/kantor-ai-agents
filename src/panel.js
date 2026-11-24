@@ -198,7 +198,63 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
             ✍️ Minta Revisi
           </button>
         </div>
+
+        <!-- OPSI A: VIDEO AI UGC MODEL MANUSIA (HEDRA / KLING) -->
+        <div style="margin-top:12px;padding:12px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <strong style="font-size:12px;color:#166534;">🌟 Uji Coba Video AI UGC Model Manusia (Opsi A):</strong>
+            <span style="font-size:10px;background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;font-weight:700;">100% GRATIS</span>
+          </div>
+          <div style="font-size:11px;color:#14532d;line-height:1.4;margin-bottom:8px;">
+            Gunakan <b>Hedra.com</b> untuk membuat video model berbicara realistis (seperti contoh TikTok) dengan 2 bahan ini:
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            <a href="/videos/model-indonesia-navigate.png" download="model-navigate-400w.png" target="_blank" style="padding:6px 10px;background:#15803d;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+              📸 1. Unduh Foto Model
+            </a>
+            <a href="/videos/audio-model-navigate-400w.mp3" download="suara-navigate-400w.mp3" target="_blank" style="padding:6px 10px;background:#0369a1;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+              🎙️ 2. Unduh Suara MP3
+            </a>
+            <a href="https://www.hedra.com" target="_blank" style="padding:6px 10px;background:#7e22ce;color:#fff;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+              🌐 3. Buka Hedra.com
+            </a>
+          </div>
+          <div style="border-top:1px dashed #86efac;padding-top:8px;margin-top:6px;display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:11px;color:#334155;">Punya video hasil Hedra/Kling?</span>
+            <label style="padding:5px 10px;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">
+              📤 Pasang Video ke Sini
+              <input type="file" id="input-upload-ugc" accept="video/mp4" style="display:none;" />
+            </label>
+          </div>
+        </div>
       `;
+
+      card.querySelector('#input-upload-ugc')?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const res = await fetch('/api/pipeline/upload-video', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ postId: post.id, videoBase64: reader.result }),
+            });
+            const data = await res.json();
+            if (data.success && data.videoUrl) {
+              const videoPlayer = card.querySelector('#review-video-player');
+              if (videoPlayer) {
+                videoPlayer.src = data.videoUrl + '?t=' + Date.now();
+                videoPlayer.play().catch(() => {});
+              }
+              alert('✅ Video AI UGC berhasil dipasang ke Meja Agnes!');
+            }
+          } catch (err) {
+            alert('Gagal mengunggah video: ' + err.message);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
 
       card.querySelector('#btn-copy-adcopy')?.addEventListener('click', (e) => {
         const btn = e.currentTarget;
