@@ -168,7 +168,12 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         </div>
 
         <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);">
-          <video controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${post.post_url || '/videos/post-' + post.id + '.mp4'}" onerror="if(!this.dataset.retried){this.dataset.retried='1';setTimeout(()=>{this.src=this.src.split('?')[0]+'?t='+Date.now();},3000);}"></video>
+          <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:260px;display:block;object-fit:cover;" src="${(post.post_url || '/videos/post-' + post.id + '.mp4') + '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id)}"></video>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:-6px;margin-bottom:8px;">
+          <a href="${post.post_url || '/videos/post-' + post.id + '.mp4'}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:none;font-weight:600;">
+            🔗 Buka Video di Tab Baru (MP4 Langsung)
+          </a>
         </div>
 
         <div style="font-size:12px;color:#334155;background:#f8fafc;padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line);line-height:1.5;">

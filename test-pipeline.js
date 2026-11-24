@@ -64,7 +64,7 @@ async function runTest() {
     }
 
     console.log('\n======================================================');
-    console.log(`🎬 HASIL RENDER VIDEO: ${post?.post_url || 'Berhasil di-render (cek meja Agnes)'}`);
+    console.log(`🎬 HASIL RENDER VIDEO: ${post?.post_url || 'Masih memproses di server...'}`);
     console.log(`📋 STATUS POSTINGAN: ${post?.status || 'PENDING_APPROVAL'}`);
     console.log('======================================================');
     console.log(`\n👉 SILAKAN BUKA DI BROWSER BOS RIDHO:`);
