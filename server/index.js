@@ -366,6 +366,42 @@ function persistLocalPosts() {
   }
 }
 
+// Helper ekstraksi naskah otentik & visual dari riwayat tugas Victor & Gavin di chat
+function findVictorScriptInTasks(searchTopic = '') {
+  try {
+    const victorTask = interAgentTasks.find(
+      (t) => (t.toId === 'victor' || t.fromId === 'victor') && t.result && t.result.includes('VIDEO')
+    );
+    if (!victorTask || !victorTask.result) return null;
+
+    const text = victorTask.result;
+    // Ekstrak semua baris VO dari naskah Victor
+    const voMatches = [...text.matchAll(/\*\*VO:\*\*\s*"([^"]+)"/g)].map((m) => m[1]?.trim()).filter(Boolean);
+    const fullVO = voMatches.length > 0 ? voMatches.join(' ') : null;
+
+    // Ekstrak hook/headline khas Victor
+    const hookMatch = text.match(/⚡\s*([^⚡\n\r]+?)\s*⚡/) || text.match(/\*([^*]+mati kutu[^*]*)\*/i);
+    const hook = hookMatch ? hookMatch[1].replace(/[*_]/g, '').trim() : 'GELAP GULITA JADI SIANG BENDERANG!';
+
+    const specs = [
+      '400 WATT (8 Modul Chip COB)',
+      '40.000 LUMENS SUPER TERANG',
+      'IP65 WATERPROOF TAHAN BADAI',
+      'ALUMINIUM DIE-CAST & GARANSI RESMI',
+    ];
+
+    return {
+      voiceover: fullVO,
+      hook,
+      specs,
+      rawResult: text,
+      taskId: victorTask.id,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Handler penugasan otonom antar-agen (Inter-Agent Autonomous Delegation)
 async function handleInterAgentTask(fromAgent, toAgent, taskDesc) {
   const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -420,7 +456,61 @@ Langsung berikan hasil kerjamu tanpa basa-basi pembuka yang bertele-tele.`;
     broadcastEvent('agent_task_done', taskRecord);
     console.log(`[inter-agent-task] Tugas ${toAgent.name} selesai dieksekusi.`);
 
-    // 5. Deteksi chaining delegasi lanjutan jika ada
+    // 5. Jika tugas diselesaikan oleh Victor (Video Creator), otomatis render video otentik dari naskah chat dan serahkan ke Meja Agnes
+    if (toAgent.id === 'victor' && result) {
+      (async () => {
+        try {
+          console.log(`[inter-agent-task] Victor selesai menyusun naskah di chat. Merender video otomatis untuk Meja Agnes...`);
+          const victorData = findVictorScriptInTasks();
+          const autoPostId = Date.now();
+          const autoTopic = taskDesc.match(/Navigate[^\n,.]+/i)?.[0] || 'Navigate LED Flood Light 400W IP65';
+
+          let productImg = null;
+          try {
+            const gImg = await generateProductImage({ postId: autoPostId, topic: autoTopic, specs: victorData?.specs });
+            if (gImg?.success) productImg = gImg.imagePath;
+          } catch {}
+
+          const renderRes = await renderAutomatedVideo({
+            postId: autoPostId,
+            topic: autoTopic,
+            hook: victorData?.hook || 'GELAP GULITA JADI SIANG BENDERANG!',
+            narration: victorData?.voiceover || result.slice(0, 250),
+            specs: victorData?.specs || ['400W 8 Modul COB', 'IP65 Waterproof', 'Garansi Resmi 2 Tahun'],
+            cta: 'Hubungi WhatsApp Tim Sales Sean Sekarang',
+            duration: 12,
+            productImagePath: productImg,
+          });
+
+          if (renderRes.success && renderRes.videoUrl) {
+            const newPost = {
+              id: autoPostId,
+              topic: autoTopic,
+              platform: 'Facebook Video Ads & Reels (Navigate Proyek)',
+              draft_nadia: result,
+              review_dewi: `Rekomendasi Victor & Gavin: Naskah dan storyboard otentik dari chat siap tayang di Facebook.`,
+              final_content: result,
+              post_url: renderRes.videoUrl,
+              status: 'PENDING_APPROVAL',
+              created_at: new Date().toISOString(),
+            };
+            localPosts.unshift(newPost);
+            persistLocalPosts();
+            broadcastEvent('video_rendered', {
+              postId: autoPostId,
+              videoUrl: renderRes.videoUrl,
+              engine: renderRes.engine,
+              productImageUrl: renderRes.productImageUrl,
+            });
+            console.log(`[auto-victor-video] Video naskah chat Victor berhasil terbit ke Meja Agnes: #${autoPostId}`);
+          }
+        } catch (vErr) {
+          console.error('[auto-victor-video error]', vErr.message);
+        }
+      })();
+    }
+
+    // 6. Deteksi chaining delegasi lanjutan jika ada
     if (result) {
       const chainedMatches = [...result.matchAll(/\[TUGAS_KE:\s*([a-zA-Z0-9_\s-]+?)\s*\|\s*([\s\S]+?)\]/g)];
       for (const match of chainedMatches) {
@@ -712,22 +802,24 @@ Tugasmu sebagai Planner:
     // Step 4: Gavin generate visual produk AI + Victor & Engine render video
     (async () => {
       try {
-        const hookMatch = draft.match(/Hook[^:]*:\s*([^\n\r]+)/i) || draft.match(/^([^\n\r]+)/);
-        const hookText = hookMatch ? hookMatch[1].trim() : topic;
+        // 1. Cek apakah ada naskah otentik dari Victor & Gavin di chat tasks
+        const victorData = findVictorScriptInTasks(topic);
 
-        // Ekstrak Narasi Voiceover untuk dibacakan Edge-TTS
-        const narrationMatch = draft.match(/(?:Narasi Voiceover|Voiceover|Narasi|Script)[^:]*:\s*([\s\S]*?)(?=(?:\n\s*\d+\.|\n\s*Spesifikasi|\n\s*Call To Action|\n\s*CTA|$))/i);
-        const narrationText = narrationMatch ? narrationMatch[1].replace(/[\r\n]+/g, ' ').trim() : draft.slice(0, 200);
+        const hookText = victorData?.hook || (draft.match(/Hook[^:]*:\s*([^\n\r]+)/i)?.[1]?.trim()) || topic;
 
-        // Ekstrak 3-4 spesifikasi untuk animasi bullet
-        const specsMatch = draft.match(/(?:Spesifikasi Unggulan|Spesifikasi|Spek)[^:]*:\s*([\s\S]*?)(?=(?:\n\s*\d+\.|\n\s*Call To Action|\n\s*CTA|$))/i);
-        let specsList = [];
-        if (specsMatch) {
-          specsList = specsMatch[1]
-            .split(/[\n\r]+/)
-            .map(s => s.replace(/^[-*•\d.)\s]+/, '').trim())
-            .filter(s => s.length > 2 && s.length < 50)
-            .slice(0, 4);
+        // Ekstrak Narasi Voiceover: Utamakan naskah VO otentik dari Victor di chat!
+        const narrationText = victorData?.voiceover || (draft.match(/(?:Narasi Voiceover|Voiceover|Narasi|Script)[^:]*:\s*([\s\S]*?)(?=(?:\n\s*\d+\.|\n\s*Spesifikasi|\n\s*Call To Action|\n\s*CTA|$))/i)?.[1]?.replace(/[\r\n]+/g, ' ').trim()) || draft.slice(0, 200);
+
+        let specsList = victorData?.specs || [];
+        if (specsList.length === 0) {
+          const specsMatch = draft.match(/(?:Spesifikasi Unggulan|Spesifikasi|Spek)[^:]*:\s*([\s\S]*?)(?=(?:\n\s*\d+\.|\n\s*Call To Action|\n\s*CTA|$))/i);
+          if (specsMatch) {
+            specsList = specsMatch[1]
+              .split(/[\n\r]+/)
+              .map(s => s.replace(/^[-*•\d.)\s]+/, '').trim())
+              .filter(s => s.length > 2 && s.length < 50)
+              .slice(0, 4);
+          }
         }
         if (specsList.length === 0) {
           specsList = ['Garansi Resmi PT Feihong', 'Kualitas Industri Standar Proyek', 'Efisiensi Daya Tinggi', 'Ready Stock Gudang'];
