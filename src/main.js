@@ -294,7 +294,9 @@ $('gate-form').addEventListener('submit', async (e) => {
         for (const t of chronological) {
           if (t.status === 'done' && t.result) {
             const h = getHistory(t.toId);
-            const userPrompt = `[Tugas Delegasi dari ${t.fromName} (${t.fromRole || 'Rekan'})]:\n${t.task}`;
+            const userPrompt = t.fromId === 'agnes'
+              ? `[🎖️ Instruksi Manajemen 1 Komando dari Agnes (Executive Manager)]:\n${t.task}`
+              : `[Tugas Delegasi dari ${t.fromName} (${t.fromRole || 'Rekan'})]:\n${t.task}`;
             if (!h.some((m) => m.content === t.result || (m.role === 'user' && m.content === userPrompt))) {
               setHistory(t.toId, [
                 ...h,
@@ -383,9 +385,12 @@ $('gate-form').addEventListener('submit', async (e) => {
 
           if (data.result) {
             const h = getHistory(data.toId);
+            const userPrompt = data.fromId === 'agnes'
+              ? `[🎖️ Instruksi Manajemen 1 Komando dari Agnes (Executive Manager)]:\n${data.task}`
+              : `[Tugas Delegasi dari ${data.fromName} (${data.fromRole || 'Rekan'})]:\n${data.task}`;
             setHistory(data.toId, [
               ...h,
-              { role: 'user', content: `[Tugas Delegasi dari ${data.fromName} (${data.fromRole || 'Rekan'})]:\n${data.task}` },
+              { role: 'user', content: userPrompt },
               { role: 'assistant', content: data.result },
             ]);
             // Jika chat target sedang dibuka, update tampilannya

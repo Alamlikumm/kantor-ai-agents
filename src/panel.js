@@ -141,7 +141,9 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
 
       for (const t of agentTasks) {
         if (t.status === 'done' && t.result) {
-          const userPrompt = `[Tugas Delegasi dari ${t.fromName} (${t.fromRole || 'Rekan'})]:\n${t.task}`;
+          const userPrompt = t.fromId === 'agnes'
+            ? `[🎖️ Instruksi Manajemen 1 Komando dari Agnes (Executive Manager)]:\n${t.task}`
+            : `[Tugas Delegasi dari ${t.fromName} (${t.fromRole || 'Rekan'})]:\n${t.task}`;
           const alreadyExists = newHistory.some((m) => m.content === t.result || (m.role === 'user' && m.content === userPrompt));
           if (!alreadyExists) {
             newHistory.push({ role: 'user', content: userPrompt });

@@ -609,31 +609,61 @@ function triggerInterAgentTasks(fromAgent, text) {
     }
   }
 
-  // Sinkronisasi otomatis dua arah untuk Divisi Sosial Media & Konten:
-  // Jika Agnes memberikan brief konten/video tapi hanya menugaskan salah satu meja,
-  // otomatis tembuskan brief ke meja rekannya (Patrick atau Victor) agar kedua meja selalu sinkron!
-  if (fromAgent.id === 'agnes' && sharedContentTaskDesc) {
-    if (delegatedToVictor && !delegatedToPatrick) {
-      const patrick = findAgent('patrick');
-      if (patrick) {
-        setTimeout(() => {
-          handleInterAgentTask(
-            fromAgent,
-            patrick,
-            `[Koordinasi Tim Sosial Media & Video]: Brief resmi terbaru dari Agnes untuk Navigate LED Flood Light 400W:\n"${sharedContentTaskDesc}"\n\nPatrick, tolong sinkronkan timeline postingan, riset target kontraktor/pabrik, dan pandu Charles & Shenny agar siap publish saat video Victor selesai.`
-          );
-        }, 1200);
+  // Sistem 1 Komando Terpadu:
+  // Setiap brief atau arahan dari Agnes (Executive Manager) secara otomatis mendistribusikan penugasan ke seluruh rantai komando terkait:
+  if (fromAgent.id === 'agnes') {
+    const briefDesc = sharedContentTaskDesc || (tasks.length > 0 ? tasks[0].taskDesc : '');
+
+    if (briefDesc) {
+      if (!delegatedToPatrick) {
+        const patrick = findAgent('patrick');
+        if (patrick) {
+          setTimeout(() => {
+            handleInterAgentTask(
+              fromAgent,
+              patrick,
+              `[🎖️ Instruksi Manajemen 1 Komando]: Brief resmi terbaru dari Agnes untuk Navigate LED Flood Light 400W:\n"${briefDesc}"\n\nPatrick, tolong koordinasikan tim (Victor, Gavin, Charles, Shenny), susun strategi Reels, dan tentukan timeline postingan.`
+            );
+          }, 1000);
+        }
       }
-    } else if (delegatedToPatrick && !delegatedToVictor) {
-      const victor = findAgent('victor');
-      if (victor) {
-        setTimeout(() => {
-          handleInterAgentTask(
-            fromAgent,
-            victor,
-            `[Produksi Naskah & Video Otentik]: Brief resmi terbaru dari Agnes untuk Navigate LED Flood Light 400W:\n"${sharedContentTaskDesc}"\n\nVictor, tolong susun naskah 5-scene vertical 9:16, hook, visual cue, teks overlay, dan voiceover otentik Navigate 400W.`
-          );
-        }, 1200);
+      if (!delegatedToVictor) {
+        const victor = findAgent('victor');
+        if (victor) {
+          setTimeout(() => {
+            handleInterAgentTask(
+              fromAgent,
+              victor,
+              `[🎖️ Instruksi Manajemen 1 Komando]: Brief resmi terbaru dari Agnes untuk Navigate LED Flood Light 400W:\n"${briefDesc}"\n\nVictor, tolong susun breakdown storyboard 5-scene vertical 9:16, hook, dan voiceover otentik.`
+            );
+          }, 2000);
+        }
+      }
+    } else if (tasks.length === 0) {
+      // Jika Agnes merespons arahan tanpa tag [TUGAS_KE:], tapi topiknya relevan dengan konten/promosi/revisi
+      const isContentCmd = /navigate|video|konten|revisi|reels|iklan|promo|storyboard|lampu/i.test(text);
+      if (isContentCmd) {
+        const commandSummary = text.slice(0, 300).replace(/[\r\n]+/g, ' ').trim();
+        const patrick = findAgent('patrick');
+        const victor = findAgent('victor');
+        if (patrick) {
+          setTimeout(() => {
+            handleInterAgentTask(
+              fromAgent,
+              patrick,
+              `[🎖️ Instruksi Manajemen 1 Komando]: ${commandSummary}`
+            );
+          }, 1000);
+        }
+        if (victor) {
+          setTimeout(() => {
+            handleInterAgentTask(
+              fromAgent,
+              victor,
+              `[🎖️ Instruksi Manajemen 1 Komando]: ${commandSummary}`
+            );
+          }, 2000);
+        }
       }
     }
   }

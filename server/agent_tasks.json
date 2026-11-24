@@ -28,6 +28,34 @@
     "result": "Siap Bu Agnes! Brief resmi terbaru dari Bu Agnes untuk video promosi Navigate LED Flood Light 400W IP65 telah gue terima dan langsung gue koordinasikan ke seluruh divisi Sosial Media & Video:\n\n1. **Sinkronisasi Tim Produksi Video (Victor & Gavin):** Victor sudah menyusun naskah 5-scene (durasi 25s, vertikal 9:16) mengacu ketat pada klaim resmi: 400W, IP65 Waterproof, 8 Modul Chip COB, dan CTA [LINK WA]. Gavin menyiapkan watermark semi-transparan dan lower-third spek resmi.\n2. **Target Audiens & Placement:** Difokuskan 100% pada Facebook Reels dan Instagram Reels dengan sasaran: Kontraktor MEP, pengelola gudang logistik, pemilik pabrik, dan instalatir lapangan proyek outdoor.\n3. **Kesiapan Copywriting (Charles):** Ad copy Facebook Ads diselaraskan dengan naskah video Victor agar konsisten.\n4. **Penjadwalan (Shenny):** Distribusi postingan ditahan sementara sampai video final disetujui Agnes di Meja Review.\n\nSeluruh tim sudah bergerak dan selaras dengan arahan Bu Agnes!"
   },
   {
+    "id": "task-agnes-gavin-brief-video-400w",
+    "fromId": "agnes",
+    "fromName": "Agnes",
+    "fromRole": "Executive Manager",
+    "toId": "gavin",
+    "toName": "Gavin",
+    "toRole": "Graphic & Visual Designer",
+    "task": "[Instruksi Manajemen 1 Komando]: Siapkan aset visual grafis pendukung untuk video promosi Navigate LED Flood Light 400W IP65 (cover 9:16, watermark, badge spek 400W & IP65) mengacu pada foto fisik Navigate.",
+    "status": "done",
+    "createdAt": "2026-11-24T08:20:04.000Z",
+    "completedAt": "2026-11-24T08:20:09.000Z",
+    "result": "Siap Bu Agnes! Aset visual resmi Navigate 400W sudah gue siapkan untuk mendukung video Victor dan kampanye Patrick:\n1. Cover/Thumbnail vertical 9:16 dengan headline \"GELAP JADI SIANG BENDERANG!\".\n2. Badge spek resmi: 400W · IP65 · 8 Modul COB.\n3. Watermark Navigate transparan (65%) safe-zone FB Reels.\nSemua aset mengacu pada foto fisik autentik Navigate."
+  },
+  {
+    "id": "task-agnes-charles-brief-video-400w",
+    "fromId": "agnes",
+    "fromName": "Agnes",
+    "fromRole": "Executive Manager",
+    "toId": "charles",
+    "toName": "Charles",
+    "toRole": "Copywriter",
+    "task": "[Instruksi Manajemen 1 Komando]: Susun ad copy Facebook Ads resmi untuk Navigate LED Flood Light 400W IP65 (8 Modul Chip COB) dengan CTA [LINK WA] selaras dengan naskah video Victor.",
+    "status": "done",
+    "createdAt": "2026-11-24T08:20:05.000Z",
+    "completedAt": "2026-11-24T08:20:10.000Z",
+    "result": "Siap Bu Agnes! Ad copy Facebook Ads resmi sudah gue susun:\n\n⚡ NAVIGATE 400W LED FLOOD LIGHT: AREA GELAP GULITA JADI SIANG BENDERANG! ⚡\n\nPenerangan proyek outdoor & gudang sering redup dan cepat rusak kena badai? Ganti ke standar industri Navigate LED Flood Light 400W IP65!\n\n💡 400 Watt bertenaga 8 Modul Chip COB super terang\n🔒 Sertifikasi resmi IP65 Waterproof & Dustproof tahan hujan deras\n🛡️ Bodi aluminium die-cast tebal & heatsink sirip dingin\n\n📲 Konsultasi & Penawaran Proyek Langsung:\n👉 Hubungi via WhatsApp: [LINK WA]\n\n#NavigateLighting #LampuSorotLED #LampuProyek #LED400W #PTFeihong"
+  },
+  {
     "id": "task-agnes-patrick-revisi-400w",
     "fromId": "agnes",
     "fromName": "Agnes",
