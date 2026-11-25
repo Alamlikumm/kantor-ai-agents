@@ -846,5 +846,20 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
     get current() {
       return currentId;
     },
+    // Dipanggil oleh main.js saat event SSE video_rendered masuk
+    refreshAgnesVideoCard(videoUrl) {
+      if (currentId !== 'agnes') return;
+      const videoPlayer = document.querySelector('#review-video-player');
+      if (videoPlayer && videoUrl) {
+        const errPlaceholder = document.querySelector('#video-error-placeholder');
+        if (errPlaceholder) errPlaceholder.style.display = 'none';
+        videoPlayer.src = videoUrl + '?t=' + Date.now();
+        videoPlayer.load();
+        videoPlayer.play().catch(() => {});
+      } else {
+        // Full card reload sebagai fallback
+        loadAgnesReviewCard();
+      }
+    },
   };
 }

@@ -446,6 +446,41 @@ $('gate-form').addEventListener('submit', async (e) => {
           });
         }
 
+        // ✅ VIDEO RENDERED: n8n / FFmpeg berhasil attach video → refresh Meja Agnes otomatis
+        if (data.type === 'video_rendered') {
+          const { postId, videoUrl } = data;
+          // Tampilkan banner notifikasi video siap
+          const banner = $('banner');
+          banner.hidden = false;
+          banner.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:22px;">🎬</span>
+                <div>
+                  <strong style="color:#4ade80;">Video Siap di Meja Review Agnes!</strong><br>
+                  <span style="font-size:12px;color:#cbd5e1;">Post #${postId} — video dari n8n berhasil masuk. Agnes siap mereview.</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex:none;">
+                <button id="btn-go-agnes-video" type="button" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(16,185,129,0.4);">Ke Meja Agnes ➔</button>
+                <button id="btn-close-banner-video" type="button" style="background:transparent;color:#94a3b8;border:none;font-size:18px;cursor:pointer;padding:4px 8px;">✕</button>
+              </div>
+            </div>
+          `;
+          $('btn-go-agnes-video')?.addEventListener('click', () => {
+            banner.hidden = true;
+            selectAgent('agnes');
+          });
+          $('btn-close-banner-video')?.addEventListener('click', () => {
+            banner.hidden = true;
+          });
+
+          // Jika user sedang di chat Agnes, langsung refresh review card dengan video baru
+          if (selectedId === 'agnes') {
+            panel.refreshAgnesVideoCard(videoUrl);
+          }
+        }
+
         if (data.type === 'sales_inquiry') {
           const sean = byId.get('sean');
           if (sean) {
