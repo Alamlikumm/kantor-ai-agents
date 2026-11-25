@@ -1089,9 +1089,14 @@ app.post('/api/pipeline/attach-video', async (req, res) => {
       }
     }
 
-    const { postId, videoUrl } = req.body;
+    let { postId, videoUrl } = req.body;
     if (!postId || !videoUrl) {
       return res.status(400).json({ success: false, error: 'postId dan videoUrl wajib diisi.' });
+    }
+
+    // Auto-sanitize jika n8n mengirim URL mixkit yang diblokir browser:
+    if (String(videoUrl).includes('mixkit.co')) {
+      videoUrl = `/videos/post-${postId}.mp4`;
     }
 
     let updatedPost = null;
@@ -1680,11 +1685,24 @@ app.get('/api/pipeline/post/:id', async (req, res) => {
 
     try {
       const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [postId]);
-      if (r.rows.length) return res.json({ success: true, post: r.rows[0] });
+      if (r.rows.length) {
+        const p = r.rows[0];
+        if (p.post_url && p.post_url.includes('mixkit.co')) {
+          p.post_url = `/videos/post-${p.id}.mp4`;
+          pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [p.post_url, p.id]).catch(() => {});
+        }
+        return res.json({ success: true, post: p });
+      }
     } catch {}
 
     const local = localPosts.find((p) => Number(p.id) === postId);
-    if (local) return res.json({ success: true, post: local });
+    if (local) {
+      if (local.post_url && local.post_url.includes('mixkit.co')) {
+        local.post_url = `/videos/post-${local.id}.mp4`;
+        persistLocalPosts();
+      }
+      return res.json({ success: true, post: local });
+    }
 
     res.status(404).json({ success: false, error: 'Post tidak ditemukan.' });
   } catch (err) {
@@ -1702,10 +1720,25 @@ app.get('/api/pipeline/pending', async (req, res) => {
          WHERE status = 'PENDING_APPROVAL' 
          ORDER BY id DESC LIMIT 10`
       );
-      if (r.rows.length) return res.json({ success: true, posts: r.rows });
+      if (r.rows.length) {
+        const sanitized = r.rows.map((p) => {
+          if (p.post_url && p.post_url.includes('mixkit.co')) {
+            p.post_url = `/videos/post-${p.id}.mp4`;
+            pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2', [p.post_url, p.id]).catch(() => {});
+          }
+          return p;
+        });
+        return res.json({ success: true, posts: sanitized });
+      }
     } catch {}
 
-    const pending = localPosts.filter((p) => p.status === 'PENDING_APPROVAL');
+    const pending = localPosts.filter((p) => p.status === 'PENDING_APPROVAL').map((p) => {
+      if (p.post_url && p.post_url.includes('mixkit.co')) {
+        p.post_url = `/videos/post-${p.id}.mp4`;
+        persistLocalPosts();
+      }
+      return p;
+    });
     res.json({ success: true, posts: pending.slice(0, 10) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

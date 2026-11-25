@@ -226,6 +226,12 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
       card.className = 'agnes-review-card';
       const isApproved = post.status === 'APPROVED';
 
+      let rawVideoUrl = post.post_url || `/videos/post-${post.id}.mp4`;
+      if (rawVideoUrl.includes('mixkit.co')) {
+        rawVideoUrl = `/videos/post-${post.id}.mp4`;
+      }
+      const videoSrc = rawVideoUrl + (rawVideoUrl.includes('?') ? '' : '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id));
+
       card.innerHTML = `
         <div class="agnes-card-head">
           <div style="display:flex;align-items:center;gap:8px;">
@@ -242,7 +248,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         </div>
 
         <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);position:relative;">
-          <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:240px;display:block;object-fit:cover;" src="${(post.post_url || '/videos/post-' + post.id + '.mp4') + (String(post.post_url || '').includes('?') ? '' : '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id))}"></video>
+          <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:240px;display:block;object-fit:cover;" src="${videoSrc}"></video>
           <div id="video-error-placeholder" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,0.95);flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;color:#fff;">
             <span style="font-size:26px;margin-bottom:6px;">🎬</span>
             <strong style="font-size:12px;color:#facc15;margin-bottom:4px;">Video Belum Siap / URL Tidak Dapat Diputar</strong>
@@ -252,7 +258,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:-6px;margin-bottom:8px;">
           <span style="font-size:11px;color:#16a34a;font-weight:600;">🎬 Video Siap Diputar (Hasil AI n8n)</span>
-          <a href="${post.post_url || '/videos/post-' + post.id + '.mp4'}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:none;font-weight:600;">
+          <a href="${rawVideoUrl}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:none;font-weight:600;">
             🔗 Buka Video di Tab Baru (MP4)
           </a>
         </div>
