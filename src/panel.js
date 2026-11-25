@@ -546,12 +546,15 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           Naskah 5-scene dan prompt video AI di atas siap dieksekusi oleh <b>n8n (Kling AI / Runway)</b> untuk menghasilkan video gerak nyata (adegan semprot air badai, night to day, dan heatsink). Hasil video jadi akan otomatis masuk ke <b>Meja Review Agnes</b> untuk di-review sebelum diposting.
         </p>
 
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <button type="button" id="btn-victor-send-n8n" style="flex:1;padding:10px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(37,99,235,0.3);">
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <button type="button" id="btn-victor-send-n8n" style="flex:2;min-width:180px;padding:10px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(37,99,235,0.3);">
             🚀 Kirim Naskah & 5-Scene Prompt ke n8n
           </button>
+          <a href="/api/pipeline/n8n-workflow" download="kantor_ai_video_pipeline.json" id="btn-victor-dl-workflow" style="flex:1;min-width:130px;padding:10px 12px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 2px 6px rgba(5,150,105,0.25);">
+            📥 Unduh Workflow n8n
+          </a>
           <button type="button" id="btn-victor-copy-payload" style="padding:10px 12px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap;">
-            📋 Salin JSON n8n
+            📋 Salin JSON
           </button>
         </div>
 

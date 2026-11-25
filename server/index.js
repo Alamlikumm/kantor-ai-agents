@@ -1310,6 +1310,21 @@ app.get('/api/pipeline/n8n-payload', (req, res) => {
   }
 });
 
+// Endpoint untuk mengunduh template file n8n workflow JSON
+app.get('/api/pipeline/n8n-workflow', (req, res) => {
+  try {
+    const wfPath = fileURLToPath(new URL('../n8n_workflows/kantor_ai_video_pipeline.json', import.meta.url));
+    if (existsSync(wfPath)) {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="kantor_ai_video_pipeline.json"');
+      return res.sendFile(wfPath);
+    }
+    res.status(404).json({ success: false, error: 'File workflow n8n belum tersedia.' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // 4b3. Endpoint Unduh Foto Model Langsung (Attachment / Preview)
 app.get('/api/ugc/download-model', (req, res) => {
   try {
