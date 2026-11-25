@@ -72,7 +72,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
     }
   }
 
-  function render(agentId) {
+  async function render(agentId) {
     const agent = agentById(agentId);
     const div = divisionById(agent.division);
     document.body.style.setProperty('--c', div.color);
@@ -111,7 +111,8 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
       paint(l);
     }
     if (agentId === 'agnes') {
-      loadAgnesReviewCard();
+      // await agar card review muncul dulu baru scrollDown
+      await loadAgnesReviewCard();
     }
     if (agentId === 'victor') {
       loadVictorRenderCard();
@@ -509,7 +510,9 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         submit(text);
       });
 
-      els.messages.insertBefore(card, els.messages.firstChild);
+      els.messages.appendChild(card);
+      // Scroll ke card review Agnes agar langsung terlihat
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
       console.warn('[agnes review card error]', e);
     }
