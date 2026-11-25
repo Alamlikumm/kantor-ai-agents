@@ -242,16 +242,16 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         </div>
 
         <div style="margin:10px 0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line);position:relative;">
-          <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:240px;display:block;object-fit:cover;" src="${(post.post_url || '/videos/post-' + post.id + '.mp4') + '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id)}"></video>
+          <video id="review-video-player" controls playsinline preload="auto" style="width:100%;max-height:240px;display:block;object-fit:cover;" src="${(post.post_url || '/videos/post-' + post.id + '.mp4') + (String(post.post_url || '').includes('?') ? '' : '?t=' + (post.updated_at ? new Date(post.updated_at).getTime() : post.id))}"></video>
           <div id="video-error-placeholder" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,0.95);flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;color:#fff;">
             <span style="font-size:26px;margin-bottom:6px;">🎬</span>
-            <strong style="font-size:12px;color:#facc15;margin-bottom:4px;">Video Belum Dirender di Server</strong>
-            <p style="font-size:11px;color:#cbd5e1;margin:0 0 10px 0;">Klik tombol biru di bawah untuk render video otomatis sekarang.</p>
+            <strong style="font-size:12px;color:#facc15;margin-bottom:4px;">Video Belum Siap / URL Tidak Dapat Diputar</strong>
+            <p style="font-size:11px;color:#cbd5e1;margin:0 0 10px 0;">Jalankan workflow AI Video di n8n untuk memasang video baru, atau render draft cadangan di bawah.</p>
           </div>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:-6px;margin-bottom:8px;">
-          <span style="font-size:11px;color:#16a34a;font-weight:600;">▶️ Video Siap Diputar</span>
+          <span style="font-size:11px;color:#16a34a;font-weight:600;">🎬 Video Siap Diputar (Hasil AI n8n)</span>
           <a href="${post.post_url || '/videos/post-' + post.id + '.mp4'}" target="_blank" style="font-size:11px;color:#0284c7;text-decoration:none;font-weight:600;">
             🔗 Buka Video di Tab Baru (MP4)
           </a>
@@ -266,11 +266,12 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           <audio controls src="/api/ugc/download-audio?stream=1" style="width:100%;height:28px;outline:none;"></audio>
         </div>
 
-        <!-- Tombol Render Video Otomatis 1-Klik -->
+        <!-- Opsi Render Tambahan -->
         <div style="margin-bottom:10px;">
-          <button type="button" id="btn-render-video" style="width:100%;padding:9px 12px;background:#0284c7;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 4px rgba(2,132,199,0.25);">
-            ⚡ Render Ulang Video Otomatis (1-Klik)
+          <button type="button" id="btn-render-video" style="width:100%;padding:9px 12px;background:#475569;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:11.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 4px rgba(71,85,105,0.2);">
+            ⚡ Render Draft Cepat (FFmpeg Backup Lokal)
           </button>
+          <div style="font-size:10.5px;color:#64748b;margin-top:4px;text-align:center;">💡 Video gerak AI utama diproduksi via workflow n8n (Kling AI / Runway)</div>
           <div id="render-video-msg" style="display:none;font-size:11px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;padding:6px 10px;border-radius:6px;margin-top:6px;text-align:center;line-height:1.4;"></div>
         </div>
 

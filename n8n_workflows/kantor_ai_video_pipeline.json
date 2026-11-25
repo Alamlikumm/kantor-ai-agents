@@ -78,7 +78,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\n\n// URL Video jadi hasil AI Generator (Kling AI / Runway / Fal.ai / Creatomate)\n// Jika dihubungkan ke API Kling AI / Runway, arahkan output ke video_url di sini.\nconst finalVideoUrl = item.custom_rendered_video_url || \"https://assets.mixkit.co/videos/preview/mixkit-bright-light-beam-in-the-dark-41484-large.mp4\";\n\nreturn [{\n  json: {\n    ...item,\n    video_url: finalVideoUrl,\n    render_engine: \"AI Video Generator (Kling AI / Runway 5-Scene Pipeline)\",\n    rendered_at: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const item = $input.first().json;\n\n// URL Video jadi hasil AI Generator (Kling AI / Runway / Fal.ai / Creatomate)\n// Jika dihubungkan ke API Kling AI / Runway, arahkan output ke video_url di sini.\nconst finalVideoUrl = item.custom_rendered_video_url || \"https://www.w3schools.com/html/mov_bbb.mp4\";\n\nreturn [{\n  json: {\n    ...item,\n    video_url: finalVideoUrl,\n    render_engine: \"AI Video Generator (Kling AI / Runway 5-Scene Pipeline)\",\n    rendered_at: new Date().toISOString()\n  }\n}];"
       },
       "id": "e5f6a1b2-c3d4-4e5f-a6b7-556677889900",
       "name": "Generate AI Video (Kling AI / Pipeline)",
