@@ -11,6 +11,7 @@ import { buildSystemPrompt } from './prompts.js';
 import { renderAutomatedVideo, isFFmpegInstalled } from './video_renderer.js';
 import { generateProductImage } from './image_generator.js';
 import { generateEdgeTTS, VOICES } from './edge_tts.js';
+import { assembleClips } from './clip_assembler.js';
 
 const { Pool } = pg;
 
@@ -185,6 +186,27 @@ async function supabaseFetch(path) {
     console.error(`[supabase fetch error] ${path}:`, err.message);
     return null;
   }
+}
+
+// URL publik foto produk dari Supabase Storage untuk pipeline video n8n.
+// Prioritas: body request -> field post -> env URL penuh -> bucket+path -> kosong.
+function getProductImageUrl(reqBody = {}, post = {}) {
+  const fromRequest = String(reqBody?.productImageUrl || reqBody?.product_image_url || '').trim();
+  if (/^https?:\/\//i.test(fromRequest)) return fromRequest;
+
+  const fromPost = String(post?.product_image_url || post?.image_url || post?.metadata?.product_image_url || '').trim();
+  if (/^https?:\/\//i.test(fromPost)) return fromPost;
+
+  const explicit = String(process.env.SUPABASE_PRODUCT_IMAGE_URL || '').trim();
+  if (/^https?:\/\//i.test(explicit)) return explicit;
+
+  const bucket = String(process.env.SUPABASE_PRODUCT_IMAGE_BUCKET || '').trim();
+  const objectPath = String(process.env.SUPABASE_PRODUCT_IMAGE_PATH || '').trim();
+  if (SUPABASE_URL && bucket && objectPath) {
+    return `${SUPABASE_URL}/storage/v1/object/public/${encodeURIComponent(bucket)}/${objectPath.replace(/^\/+/, '')}`;
+  }
+
+  return '';
 }
 
 async function searchSupabaseCatalog(query, limit = 4) {
@@ -369,6 +391,84 @@ function persistLocalPosts() {
 }
 
 // Helper ekstraksi naskah otentik & visual dari riwayat tugas Victor & Gavin di chat
+// ---------- Helper Pipeline Video n8n ----------
+// URL publik website (wajib https publik agar Facebook/Instagram bisa mengambil MP4)
+function publicBaseUrl(req) {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, '');
+  const host = req?.get?.('host') || 'office.ptfeihong.com';
+  const https = req?.protocol === 'https' || req?.get?.('x-forwarded-proto') === 'https';
+  return `${https ? 'https' : 'http'}://${host}`;
+}
+
+function checkCallbackAccess(req) {
+  if (!ACCESS_CODE) return true;
+  const passed = req.get('x-access-code') || req.body?.access_code || req.body?.accessCode || req.query?.access_code;
+  return safeEqual(passed || '', ACCESS_CODE);
+}
+
+async function findPost(postId) {
+  try {
+    const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [Number(postId)]);
+    if (r.rows.length) return r.rows[0];
+  } catch {}
+  return localPosts.find((p) => Number(p.id) === Number(postId)) || null;
+}
+
+// Simpan URL video ke post (PostgreSQL + JSON lokal) lalu kabari browser via SSE
+async function linkVideoToPost(postId, videoUrl, extra = {}) {
+  let found = false;
+  try {
+    const r = await pgPool.query('UPDATE social_posts SET post_url = $1 WHERE id = $2 RETURNING id', [videoUrl, Number(postId)]);
+    found = r.rows.length > 0;
+  } catch {}
+  const local = localPosts.find((p) => Number(p.id) === Number(postId));
+  if (local) {
+    local.post_url = videoUrl;
+    local.updated_at = new Date().toISOString();
+    persistLocalPosts();
+    found = true;
+  }
+  if (found) broadcastEvent('video_rendered', { postId: Number(postId), videoUrl, ...extra });
+  return found;
+}
+
+// Parse tabel storyboard 5-scene dari naskah Victor:
+// | **00:00 - 00:03** | Visual | Overlay | **VO:** "..." |
+function parseVictorScenes(text = '') {
+  const rows = text.split(/\r?\n/).filter((l) => /^\|\s*\*{0,2}\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/.test(l.trim()));
+  const strip = (s) => s.replace(/<br\s*\/?>/gi, ' ').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+  return rows.map((row, i) => {
+    const cols = row.split('|').slice(1, -1).map((c) => c.trim());
+    const [time = '', visual = '', overlay = '', audio = ''] = cols;
+    const vo = [...audio.matchAll(/"([^"]+)"/g)].map((m) => m[1].trim()).join(' ');
+    return {
+      scene_number: i + 1,
+      time_seconds: strip(time),
+      scene_title: `Scene ${i + 1}`,
+      action_id: strip(visual),
+      overlay_text: strip(overlay),
+      voiceover_line: vo,
+    };
+  });
+}
+
+// Terjemahkan visual cue (Bahasa Indonesia) → prompt video AI Bahasa Inggris via LLM.
+async function buildEnglishVideoPrompts(scenes, productName) {
+  const fallback = (s) => `Cinematic vertical 9:16 commercial product video of ${productName}. ${s.action_id}. Ultra-realistic, sharp focus, professional commercial lighting, 4k.`;
+  try {
+    const victor = agentById('victor');
+    if (!victor || DEMO) return scenes.map(fallback);
+    const sys = 'You convert Indonesian video storyboard cues into English text-to-video prompts for Kling AI. Reply ONLY with a JSON array of strings, one prompt per scene, same order. Each prompt: vertical 9:16, cinematic, ultra-realistic, describes camera movement + subject + lighting, max 60 words, no on-screen text.';
+    const user = `Product: ${productName}\nScenes:\n${scenes.map((s) => `${s.scene_number}. ${s.action_id}`).join('\n')}`;
+    const raw = await generateAgentReply(victor, user, sys);
+    const arr = JSON.parse(raw.slice(raw.indexOf('['), raw.lastIndexOf(']') + 1));
+    return scenes.map((s, i) => (typeof arr[i] === 'string' && arr[i].trim() ? arr[i].trim() : fallback(s)));
+  } catch (e) {
+    console.warn('[n8n prompts] Gagal terjemah prompt via LLM, pakai template:', e.message);
+    return scenes.map(fallback);
+  }
+}
+
 function findVictorScriptInTasks(searchTopic = '') {
   try {
     const victorTask = interAgentTasks.find(
@@ -1033,6 +1133,32 @@ Tugasmu sebagai Planner:
   }
 });
 
+async function triggerN8nPublish(req, post) {
+  const webhookUrl = process.env.N8N_PUBLISH_WEBHOOK_URL || '';
+  if (!webhookUrl) return { sent: false, reason: 'N8N_PUBLISH_WEBHOOK_URL belum diisi di .env, posting otomatis dilewati' };
+  const full = (await findPost(post.id)) || post;
+  if (!full.post_url) return { sent: false, reason: 'Post belum punya video' };
+  const baseUrl = publicBaseUrl(req);
+  const videoUrl = /^https?:\/\//.test(full.post_url) ? full.post_url : `${baseUrl}${full.post_url}`;
+  const payload = {
+    event: 'publish_request',
+    postId: Number(full.id),
+    topic: full.topic,
+    platforms: ['facebook', 'instagram'],
+    video_url: videoUrl,
+    caption: full.final_content || full.draft_nadia || full.topic || '',
+    callback_url: `${baseUrl}/api/pipeline/mark-published`,
+    access_code: ACCESS_CODE || '',
+  };
+  try {
+    const r = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    console.log(`[publish] Post #${full.id} dikirim ke n8n publish (HTTP ${r.status})`);
+    return r.ok ? { sent: true, videoUrl } : { sent: false, reason: `Webhook n8n publish gagal (HTTP ${r.status})` };
+  } catch (e) {
+    return { sent: false, reason: `Webhook n8n publish error: ${e.message}` };
+  }
+}
+
 // 4. Endpoint Approval (Dipanggil n8n saat Bos Ridho balas 'APPROVE' via WhatsApp)
 app.post('/api/pipeline/approve', requireAccess, async (req, res) => {
   try {
@@ -1068,9 +1194,15 @@ app.post('/api/pipeline/approve', requireAccess, async (req, res) => {
       });
     }
 
+    // Setelah approve → minta n8n posting ke Facebook & Instagram
+    const publish = await triggerN8nPublish(req, updatedPost);
+
     res.json({
       success: true,
-      message: `Post #${postId} berhasil di-approve! Siap diposting.`,
+      message: publish.sent
+        ? `Post #${postId} di-approve & dikirim ke n8n untuk diposting ke Facebook/Instagram.`
+        : `Post #${postId} berhasil di-approve! (${publish.reason})`,
+      publish,
       post: updatedPost,
     });
   } catch (err) {
@@ -1082,11 +1214,8 @@ app.post('/api/pipeline/approve', requireAccess, async (req, res) => {
 // 4b. Endpoint Tautkan Video Hasil Render (Dipanggil n8n / AI Video Renderer)
 app.post('/api/pipeline/attach-video', async (req, res) => {
   try {
-    if (ACCESS_CODE) {
-      const passed = req.get('x-access-code') || req.body?.access_code || req.body?.accessCode || req.query?.access_code;
-      if (!safeEqual(passed || '', ACCESS_CODE)) {
-        return res.status(401).json({ success: false, error: 'Kode akses salah atau belum diisi.' });
-      }
+    if (!checkCallbackAccess(req)) {
+      return res.status(401).json({ success: false, error: 'Kode akses salah atau belum diisi.' });
     }
 
     let { postId, videoUrl } = req.body;
@@ -1142,6 +1271,88 @@ app.post('/api/pipeline/attach-video', async (req, res) => {
   }
 });
 
+// 4b1. Endpoint Terima Klip AI dari n8n (Fal.ai / Kling) → website gabungkan jadi 1 MP4 Reels
+// Body: { postId, clips: [{ scene_number, url }] | ["url", ...], voiceover?: "..." }
+app.post('/api/pipeline/attach-clips', async (req, res) => {
+  try {
+    if (!checkCallbackAccess(req)) {
+      return res.status(401).json({ success: false, error: 'Kode akses salah atau belum diisi.' });
+    }
+    const { postId, voiceover } = req.body || {};
+    const rawClips = Array.isArray(req.body?.clips) ? req.body.clips : [];
+    const clips = rawClips
+      .map((c, i) => (typeof c === 'string' ? { scene_number: i + 1, url: c } : c))
+      .filter((c) => c && typeof c.url === 'string' && /^https?:\/\//.test(c.url))
+      .sort((a, b) => (Number(a.scene_number) || 0) - (Number(b.scene_number) || 0));
+    if (!postId || clips.length === 0) {
+      return res.status(400).json({ success: false, error: 'postId dan clips (URL http/https) wajib diisi.' });
+    }
+    const post = await findPost(postId);
+    if (!post) return res.status(404).json({ success: false, error: `Post #${postId} tidak ditemukan.` });
+
+    // Overlay & voiceover diambil dari payload terakhir yang dikirim ke n8n (naskah Victor)
+    let payload = null;
+    try {
+      payload = JSON.parse(readFileSync(fileURLToPath(new URL('./n8n_latest_payload.json', import.meta.url)), 'utf8'));
+      if (Number(payload.postId) !== Number(postId)) payload = null;
+    } catch {}
+    const sceneMeta = new Map((payload?.scenes || []).map((s) => [Number(s.scene_number), s]));
+    const clipsWithText = clips.map((c) => ({
+      ...c,
+      overlay_text: c.overlay_text ?? sceneMeta.get(Number(c.scene_number))?.overlay_text ?? '',
+    }));
+    const voText = voiceover || payload?.full_voiceover_script || '';
+
+    // Balas cepat agar n8n tidak timeout; penggabungan jalan di background
+    res.status(202).json({ success: true, status: 'ASSEMBLING', message: `${clips.length} klip diterima, sedang digabung untuk Post #${postId}.` });
+    broadcastEvent('video_assembling', { postId: Number(postId), clips: clips.length });
+
+    const result = await assembleClips({ postId, clips: clipsWithText, voiceoverText: voText, videosDir });
+    if (result.success) {
+      await linkVideoToPost(postId, result.videoUrl, { engine: result.engine });
+      console.log(`[attach-clips] Post #${postId}: ${clips.length} klip AI digabung (${result.elapsedMs}ms) → ${result.videoUrl}`);
+    } else {
+      broadcastEvent('video_render_failed', { postId: Number(postId), error: result.error });
+      console.error(`[attach-clips] Gagal menggabungkan klip Post #${postId}:`, result.error);
+    }
+  } catch (err) {
+    console.error('[attach clips error]', err);
+    if (!res.headersSent) res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4e. Callback dari n8n setelah posting ke Facebook/Instagram selesai
+// Body: { postId, status: 'PUBLISHED'|'FAILED', facebook_post_id?, instagram_media_id?, error? }
+app.post('/api/pipeline/mark-published', async (req, res) => {
+  try {
+    if (!checkCallbackAccess(req)) {
+      return res.status(401).json({ success: false, error: 'Kode akses salah atau belum diisi.' });
+    }
+    const { postId, facebook_post_id = null, instagram_media_id = null, error = null } = req.body || {};
+    const status = String(req.body?.status || 'PUBLISHED').toUpperCase() === 'FAILED' ? 'PUBLISH_FAILED' : 'PUBLISHED';
+    if (!postId) return res.status(400).json({ success: false, error: 'postId wajib diisi.' });
+
+    let found = false;
+    try {
+      const r = await pgPool.query('UPDATE social_posts SET status = $1 WHERE id = $2 RETURNING id', [status, Number(postId)]);
+      found = r.rows.length > 0;
+    } catch {}
+    const local = localPosts.find((p) => Number(p.id) === Number(postId));
+    if (local) {
+      Object.assign(local, { status, facebook_post_id, instagram_media_id, publish_error: error, published_at: new Date().toISOString() });
+      persistLocalPosts();
+      found = true;
+    }
+    if (!found) return res.status(404).json({ success: false, error: `Post #${postId} tidak ditemukan.` });
+
+    broadcastEvent('post_published', { postId: Number(postId), status, facebook_post_id, instagram_media_id, error });
+    console.log(`[publish] Post #${postId} → ${status}`, { facebook_post_id, instagram_media_id, error });
+    res.json({ success: true, status });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 4b2. Endpoint Upload Video AI UGC Langsung (MP4 dari Hedra / Kling / CapCut)
 app.post('/api/pipeline/upload-video', async (req, res) => {
   try {
@@ -1179,7 +1390,7 @@ app.post('/api/pipeline/upload-video', async (req, res) => {
 // 4d. Endpoint Kirim Naskah & 5-Scene Prompt Video AI ke n8n (Production Pipeline)
 app.post('/api/pipeline/send-to-n8n', async (req, res) => {
   try {
-    const { postId = 1795490268558, customWebhookUrl = '' } = req.body;
+    const { postId = 1795490268558, customWebhookUrl = '', productImageUrl: productImageUrlInput = '', product_image_url: productImageUrlSnake = '' } = req.body || {};
     let post = null;
     try {
       const r = await pgPool.query('SELECT * FROM social_posts WHERE id = $1', [Number(postId)]);
@@ -1190,9 +1401,11 @@ app.post('/api/pipeline/send-to-n8n', async (req, res) => {
     }
 
     const victorData = findVictorScriptInTasks(post?.topic || '');
-    const webhookUrl = customWebhookUrl || process.env.N8N_VIDEO_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL || '';
+    const webhookUrl = req.body?.copyOnly ? '' : (customWebhookUrl || process.env.N8N_VIDEO_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL || '');
+    const productName = 'Navigate LED Flood Light 400W IP65 Outdoor';
+    const productImageUrl = getProductImageUrl({ productImageUrl: productImageUrlInput, product_image_url: productImageUrlSnake }, post);
 
-    const scenes = [
+    const defaultScenes = [
       {
         scene_number: 1,
         time_seconds: "00:00 - 00:03",
@@ -1240,15 +1453,27 @@ app.post('/api/pipeline/send-to-n8n', async (req, res) => {
       }
     ];
 
-    const host = req.get('host') || 'office.ptfeihong.com';
-    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
-    const callbackUrl = `${protocol}://${host}/api/pipeline/attach-video`;
+    // Pakai storyboard asli dari naskah Victor (website = otak); fallback ke template default
+    let scenes = defaultScenes;
+    let sceneSource = 'default_template';
+    const victorScenes = parseVictorScenes(victorData?.rawResult || '');
+    if (victorScenes.length) {
+      const prompts = await buildEnglishVideoPrompts(victorScenes, productName);
+      scenes = victorScenes.map((sc, i) => ({ ...sc, ai_video_prompt_en: prompts[i] }));
+      sceneSource = 'victor_storyboard';
+    }
+
+    const baseUrl = publicBaseUrl(req);
+    const callbackUrl = `${baseUrl}/api/pipeline/attach-video`;
+    const clipsCallbackUrl = `${baseUrl}/api/pipeline/attach-clips`;
 
     const n8nPayload = {
       event: 'video_production_request',
       postId: post?.id || Number(postId),
-      product_name: 'Navigate LED Flood Light 400W IP65 Outdoor',
+      product_name: productName,
+      product_image_url: productImageUrl || null,
       target_platform: 'Facebook Reels & Instagram Reels (9:16)',
+      scene_source: sceneSource,
       total_duration_seconds: 25,
       hook: victorData?.hook || '⚡ NAVIGATE 400W: GELAP JADI SIANG! ⚡',
       full_voiceover_script: victorData?.voiceover || 'Lampu sorot biasa mati kutu di area seluas ini? Liat ini! Boom! Seketika gelap gulita langsung berubah jadi siang benderang! Didukung 8 Modul Chip COB bertenaga 400 Watt, sorotannya padat, tajam, dan merata ke segala penjuru! Disemprot air badai bertekanan tinggi? Sertifikasi IP65 memastikan nol bocor dan nol konslet! Bodi aluminium die-cast kokoh dengan heatsink sirip tebal untuk buang panas maksimal. Dapatkan penawaran proyek sekarang. Hubungi tim sales kami untuk penawaran terbaik!',
@@ -1262,8 +1487,11 @@ app.post('/api/pipeline/send-to-n8n', async (req, res) => {
       ],
       scenes,
       callback_url: callbackUrl,
+      clips_callback_url: clipsCallbackUrl,
+      fal_model: process.env.FAL_VIDEO_MODEL || 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+      clip_duration: '5',
       access_code: ACCESS_CODE || '',
-      instructions_for_n8n: `1. Generate 5 klip video memakai Kling AI / Runway Gen-3 menggunakan ai_video_prompt_en dari tiap scene.\n2. Generate audio voiceover via ElevenLabs / Edge-TTS dari full_voiceover_script.\n3. Gabungkan klip 1-5 + audio + overlay_text (format vertical 9:16).\n4. Kirim URL file MP4 hasil render kembali ke website via POST ${callbackUrl} dengan body { postId: ${post?.id || postId}, videoUrl: "<URL_MP4>" } agar muncul di Meja Agnes untuk di-review & approve sebelum diposting!`,
+      instructions_for_n8n: `1. Generate 5 klip video memakai Kling AI / Runway Gen-3 menggunakan ai_video_prompt_en dari tiap scene.\n2. Generate audio voiceover via ElevenLabs / Edge-TTS dari full_voiceover_script.\n3. Gabungkan klip 1-5 + audio + overlay_text (format vertical 9:16).\n4. Kirim URL file MP4 hasil render kembali ke website via POST ${callbackUrl} dengan body { postId: ${post?.id || postId}, videoUrl: "<URL_MP4>" } agar muncul di Meja Agnes untuk di-review & approve sebelum diposting!\n5. Jika product_image_url tidak kosong, pakai mode image-to-video Fal.ai/Kling dengan image_url = product_image_url supaya foto produk asli dipakai. Jika kosong, pakai text-to-video seperti biasa.`,
       createdAt: new Date().toISOString()
     };
 
@@ -1287,7 +1515,7 @@ app.post('/api/pipeline/send-to-n8n', async (req, res) => {
       }
     }
 
-    console.log(`[send-to-n8n] Payload n8n untuk Post #${post?.id || postId} siap (Sent: ${webhookSent}, Status: ${webhookStatus})`);
+    console.log(`[send-to-n8n] Payload n8n untuk Post #${post?.id || postId} siap (Sent: ${webhookSent}, Status: ${webhookStatus}, Foto produk: ${productImageUrl || 'tidak ada'})`);
     res.json({
       success: true,
       webhookSent,
@@ -1318,10 +1546,12 @@ app.get('/api/pipeline/n8n-payload', (req, res) => {
 // Endpoint untuk mengunduh template file n8n workflow JSON
 app.get('/api/pipeline/n8n-workflow', (req, res) => {
   try {
-    const wfPath = fileURLToPath(new URL('../n8n_workflows/kantor_ai_video_pipeline.json', import.meta.url));
+    // ?type=publish → workflow posting FB & IG; default → workflow produksi video
+    const fileName = req.query.type === 'publish' ? 'kantor_ai_publish_fb_ig.json' : 'kantor_ai_video_pipeline.json';
+    const wfPath = fileURLToPath(new URL(`../n8n_workflows/${fileName}`, import.meta.url));
     if (existsSync(wfPath)) {
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', 'attachment; filename="kantor_ai_video_pipeline.json"');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       return res.sendFile(wfPath);
     }
     res.status(404).json({ success: false, error: 'File workflow n8n belum tersedia.' });

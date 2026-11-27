@@ -1,0 +1,313 @@
+{
+  "name": "Kantor AI - Publish FB & IG",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📣 POSTING OTOMATIS FACEBOOK & INSTAGRAM\n\nDipanggil website saat Bos Ridho / Agnes klik **APPROVE & PUBLISH**.\n\n**Setup sekali:**\n1. Isi `fb_page_id` & `ig_user_id` di node **⚙️ Konfigurasi Meta**.\n2. Buat credential *Query Auth* bernama **Meta Page Access Token** → Name: `access_token`, Value: Page Access Token (permission: `pages_manage_posts`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`). Pilih di semua node Graph API.\n3. Salin *Production URL* webhook ini ke `.env` website: `N8N_PUBLISH_WEBHOOK_URL=...`\n4. `PUBLIC_BASE_URL` website harus https publik, karena Facebook/Instagram mengambil MP4 langsung dari website.",
+        "height": 360,
+        "width": 720
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000001",
+      "name": "📋 PANDUAN PUBLISH",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, -100]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kantor-ai-publish",
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000002",
+      "name": "Webhook Approve Website",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 420],
+      "webhookId": "kantor-ai-publish-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ⚙️ GANTI 2 ID DI BAWAH dengan milik Anda\nconst fb_page_id = 'ISI_FACEBOOK_PAGE_ID';\nconst ig_user_id = 'ISI_INSTAGRAM_BUSINESS_ACCOUNT_ID';\nconst graph = 'https://graph.facebook.com/v21.0';\n\nconst raw = $input.first().json;\nconst d = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\nif (!d.postId || !d.video_url) throw new Error('Payload website wajib berisi postId dan video_url.');\nif (!/^https:\\/\\//.test(d.video_url)) throw new Error('video_url harus https publik agar bisa diambil Meta: ' + d.video_url);\nif (fb_page_id.startsWith('ISI_') || ig_user_id.startsWith('ISI_')) throw new Error('Isi fb_page_id & ig_user_id di node Konfigurasi Meta dulu.');\n\nreturn [{ json: {\n  fb_page_id, ig_user_id, graph,\n  postId: d.postId,\n  video_url: d.video_url,\n  caption: String(d.caption || '').slice(0, 2200),\n  callback_url: d.callback_url,\n  access_code: d.access_code || ''\n} }];"
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000003",
+      "name": "⚙️ Konfigurasi Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.graph }}/{{ $json.fb_page_id }}/videos",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "file_url", "value": "={{ $json.video_url }}" },
+            { "name": "description", "value": "={{ $json.caption }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000004",
+      "name": "Facebook - Posting Video ke Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 420],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpQueryAuth": { "id": "meta-page-token", "name": "Meta Page Access Token" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Konfigurasi Meta').first().json.graph }}/{{ $('⚙️ Konfigurasi Meta').first().json.ig_user_id }}/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "media_type", "value": "REELS" },
+            { "name": "video_url", "value": "={{ $('⚙️ Konfigurasi Meta').first().json.video_url }}" },
+            { "name": "caption", "value": "={{ $('⚙️ Konfigurasi Meta').first().json.caption }}" },
+            { "name": "share_to_feed", "value": "true" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000005",
+      "name": "Instagram - Buat Container Reels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 420],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpQueryAuth": { "id": "meta-page-token", "name": "Meta Page Access Token" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('⚙️ Konfigurasi Meta').first().json;\nconst fb = $('Facebook - Posting Video ke Page').first().json;\nconst ig = $input.first().json;\nreturn [{ json: {\n  ...cfg,\n  facebook_post_id: fb.id || null,\n  facebook_error: fb.error ? (fb.error.message || JSON.stringify(fb.error)) : null,\n  container_id: ig.id || null,\n  instagram_error: ig.error ? (ig.error.message || JSON.stringify(ig.error)) : (ig.id ? null : 'Container IG gagal dibuat'),\n  attempt: 0\n} }];"
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000006",
+      "name": "Simpan Hasil Awal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "p1-cond-0001",
+              "leftValue": "={{ $json.container_id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000007",
+      "name": "Container IG Ada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1200, 420]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000008",
+      "name": "Tunggu 30 Detik",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1440, 320],
+      "webhookId": "kantor-ai-publish-wait"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.graph }}/{{ $json.container_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [{ "name": "fields", "value": "status_code" }]
+        },
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000009",
+      "name": "Instagram - Cek Status Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 320],
+      "credentials": {
+        "httpQueryAuth": { "id": "meta-page-token", "name": "Meta Page Access Token" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// FINISHED → publish, IN_PROGRESS → tunggu lagi (maks 20x30 detik), selain itu gagal\nconst prev = $('Tunggu 30 Detik').first().json;\nconst status = $input.first().json.status_code || 'UNKNOWN';\nconst attempt = (prev.attempt || 0) + 1;\nlet next = 'wait';\nif (status === 'FINISHED') next = 'publish';\nelse if (status !== 'IN_PROGRESS' || attempt >= 20) next = 'fail';\nreturn [{ json: { ...prev, attempt, ig_status: status, next, instagram_error: next === 'fail' ? `Container IG status ${status} setelah ${attempt} cek` : prev.instagram_error } }];"
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000010",
+      "name": "Evaluasi Status IG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, 320]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [{ "id": "p1-sw-1", "leftValue": "={{ $json.next }}", "rightValue": "publish", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "publish"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [{ "id": "p1-sw-2", "leftValue": "={{ $json.next }}", "rightValue": "wait", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "wait"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [{ "id": "p1-sw-3", "leftValue": "={{ $json.next }}", "rightValue": "fail", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fail"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000011",
+      "name": "Langkah Berikutnya",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [2160, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.graph }}/{{ $json.ig_user_id }}/media_publish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [{ "name": "creation_id", "value": "={{ $json.container_id }}" }]
+        },
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000012",
+      "name": "Instagram - Publish Reels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 220],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpQueryAuth": { "id": "meta-page-token", "name": "Meta Page Access Token" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ringkas hasil akhir untuk dikirim balik ke website\nconst src = $input.first().json;\nconst fromPublish = $('Instagram - Publish Reels').isExecuted;\nconst base = fromPublish ? $('Evaluasi Status IG').last().json : src;\nlet instagram_media_id = null;\nlet igErr = base.instagram_error || null;\nif (fromPublish) {\n  instagram_media_id = src.id || null;\n  if (src.error) igErr = src.error.message || JSON.stringify(src.error);\n}\nconst errors = [base.facebook_error && `FB: ${base.facebook_error}`, igErr && `IG: ${igErr}`].filter(Boolean);\nconst ok = base.facebook_post_id || instagram_media_id;\nreturn [{ json: {\n  callback_url: base.callback_url,\n  access_code: base.access_code,\n  body: {\n    postId: base.postId,\n    status: ok ? 'PUBLISHED' : 'FAILED',\n    facebook_post_id: base.facebook_post_id || null,\n    instagram_media_id,\n    error: errors.length ? errors.join(' | ') : null\n  }\n} }];"
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000013",
+      "name": "Ringkas Hasil Posting",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callback_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "x-access-code", "value": "={{ $json.access_code }}" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "p0a1b2c3-0000-4000-8000-000000000014",
+      "name": "Lapor Status ke Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2880, 420]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Approve Website": {
+      "main": [[{ "node": "⚙️ Konfigurasi Meta", "type": "main", "index": 0 }]]
+    },
+    "⚙️ Konfigurasi Meta": {
+      "main": [[{ "node": "Facebook - Posting Video ke Page", "type": "main", "index": 0 }]]
+    },
+    "Facebook - Posting Video ke Page": {
+      "main": [[{ "node": "Instagram - Buat Container Reels", "type": "main", "index": 0 }]]
+    },
+    "Instagram - Buat Container Reels": {
+      "main": [[{ "node": "Simpan Hasil Awal", "type": "main", "index": 0 }]]
+    },
+    "Simpan Hasil Awal": {
+      "main": [[{ "node": "Container IG Ada?", "type": "main", "index": 0 }]]
+    },
+    "Container IG Ada?": {
+      "main": [
+        [{ "node": "Tunggu 30 Detik", "type": "main", "index": 0 }],
+        [{ "node": "Ringkas Hasil Posting", "type": "main", "index": 0 }]
+      ]
+    },
+    "Tunggu 30 Detik": {
+      "main": [[{ "node": "Instagram - Cek Status Container", "type": "main", "index": 0 }]]
+    },
+    "Instagram - Cek Status Container": {
+      "main": [[{ "node": "Evaluasi Status IG", "type": "main", "index": 0 }]]
+    },
+    "Evaluasi Status IG": {
+      "main": [[{ "node": "Langkah Berikutnya", "type": "main", "index": 0 }]]
+    },
+    "Langkah Berikutnya": {
+      "main": [
+        [{ "node": "Instagram - Publish Reels", "type": "main", "index": 0 }],
+        [{ "node": "Tunggu 30 Detik", "type": "main", "index": 0 }],
+        [{ "node": "Ringkas Hasil Posting", "type": "main", "index": 0 }]
+      ]
+    },
+    "Instagram - Publish Reels": {
+      "main": [[{ "node": "Ringkas Hasil Posting", "type": "main", "index": 0 }]]
+    },
+    "Ringkas Hasil Posting": {
+      "main": [[{ "node": "Lapor Status ke Website", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "kantor-ai-publish-v1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "kantor-ai-publish-fb-ig",
+  "tags": [{ "name": "Kantor AI Video", "id": "kantor-ai-video-tag" }]
+}

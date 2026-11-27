@@ -3,18 +3,15 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## 🎬 PIPELINE PRODUKSI VIDEO OTOMATIS KANTOR AI\n\n**Alur Kerja:**\n1. **Meja Victor (Website 3D)** mengirim naskah 5-scene + prompt visual bahasa Inggris ke Webhook n8n.\n2. **n8n** mengekstrak prompt scene 1 s/d 5 (Night-to-day, semprotan air badai IP65, zoom 8 chip COB, heatsink).\n3. **AI Video Generator** merender klip video gerak nyata (Kling AI / Runway / Fal.ai / Creatomate).\n4. **Callback ke Meja Review Agnes**: n8n mengirim URL MP4 hasil render kembali ke website.\n5. **Review & Approval**: Bos Ridho & Agnes memutar video di browser. Hanya setelah di-approve, konten diposting ke Facebook/Instagram!",
-        "height": 260,
-        "width": 960
+        "content": "## 🎬 PIPELINE PRODUKSI VIDEO OTOMATIS KANTOR AI\n\n**Alur Kerja:**\n1. **Website (Meja Victor)** kirim naskah 5-scene + prompt Inggris ke Webhook ini.\n2. n8n memecah jadi 5 scene → kirim ke **Fal.ai (Kling AI)** secara paralel.\n3. n8n cek status tiap 60 detik sampai ke-5 klip selesai (maks ±20 menit).\n4. n8n kirim 5 URL klip ke website `/api/pipeline/attach-clips`.\n5. Website gabungkan klip + voiceover + teks overlay → muncul di **Meja Review Agnes**.\n6. Setelah **APPROVE**, website memanggil workflow **Kantor AI - Publish FB & IG**.\n\n**Setup sekali:** buat credential *Header Auth* bernama **Fal.ai API Key** → Name: `Authorization`, Value: `Key <FAL_KEY>` lalu pilih di 3 node Fal.ai.",
+        "height": 340,
+        "width": 760
       },
       "id": "e0a1b2c3-d4e5-4f6a-8b9c-012345678901",
       "name": "📋 PANDUAN PIPELINE VIDEO AI",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [
-        100,
-        80
-      ]
+      "position": [-60, -60]
     },
     {
       "parameters": {
@@ -27,169 +24,262 @@
       "name": "Webhook Meja Victor",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        120,
-        420
-      ],
+      "position": [0, 420],
       "webhookId": "kantor-ai-video-webhook"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Naskah 5-Scene & AI Prompts berhasil diterima n8n! Video sedang diproses di pabrik AI...\",\n  \"postId\": {{ $json.body?.postId || $json.postId || 1795490268558 }},\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Naskah diterima n8n. 5 klip sedang dirender di Fal.ai (Kling)...\",\n  \"postId\": {{ JSON.stringify($json.body?.postId ?? null) }},\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
         "options": {}
       },
       "id": "b2c3d4e5-f6a1-4b2c-9d3e-223344556677",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [
-        380,
-        300
-      ]
+      "position": [240, 300]
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst data = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nconst postId = data.postId || 1795490268558;\nconst callbackUrl = data.callback_url || \"https://office.ptfeihong.com/api/pipeline/attach-video\";\nconst accessCode = data.access_code || \"\";\nconst scenes = Array.isArray(data.scenes) ? data.scenes : [];\n\n// 5 Scene AI Video Prompts siap render (Format vertikal 9:16)\nconst s1 = scenes[0] || {};\nconst s2 = scenes[1] || {};\nconst s3 = scenes[2] || {};\nconst s4 = scenes[3] || {};\nconst s5 = scenes[4] || {};\n\nreturn [{\n  json: {\n    postId,\n    product_name: data.product_name || \"Navigate LED Flood Light 400W IP65 Outdoor\",\n    target_platform: data.target_platform || \"Facebook Reels & Instagram Reels (9:16)\",\n    full_voiceover_script: data.full_voiceover_script || \"\",\n    facebook_ad_copy: data.facebook_ad_copy || \"\",\n    callback_url: callbackUrl,\n    access_code: accessCode,\n    scenes,\n    // 5 Prompt Bahasa Inggris siap disalurkan ke Kling AI / Runway / Fal.ai:\n    scene_1_prompt: s1.ai_video_prompt_en || \"Cinematic vertical 9:16 video, pitch-black industrial construction site at night, human hand flips industrial power switch ON, instantly a powerful Navigate 400W LED flood light illuminates the entire 100-meter field into bright daylight, sharp clean lighting, realistic light beam cutting through darkness, 4k ultra-realistic.\",\n    scene_2_prompt: s2.ai_video_prompt_en || \"Macro slow motion vertical 9:16 shot, high-pressure water washer spraying powerful water blasts directly onto operating Navigate industrial LED floodlight, water splashing violently, light stays 100% on, double silicone seal and tempered glass visible, IP65 extreme waterproof test, commercial product commercial, 4k.\",\n    scene_3_prompt: s3.ai_video_prompt_en || \"Extreme macro camera zoom vertical 9:16 into array of 8 COB LED chip modules glowing intensely behind optical glass lenses, brilliant daylight 40,000 lumens, premium metallic finish, razor-sharp focus, cinematic commercial lighting, 4k.\",\n    scene_4_prompt: s4.ai_video_prompt_en || \"Cinematic vertical 9:16 orbit shot around rugged dark-gray aluminum die-cast housing of heavy-duty Navigate floodlight, focusing on dense cooling heatsink fins dissipating heat, industrial durability, studio lighting, 4k.\",\n    scene_5_prompt: s5.ai_video_prompt_en || \"Clean vertical 9:16 hero shot of Navigate 400W LED flood light on mounting bracket, elegant glowing rim light, professional commercial outro, WhatsApp order button graphics, 4k.\"\n  }\n}];"
+        "jsCode": "// Pecah naskah dari website menjadi 1 item per scene (dirender paralel di Fal.ai)\nconst raw = $input.first().json;\nconst data = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nconst scenes = Array.isArray(data.scenes) ? data.scenes : [];\nif (!data.postId) throw new Error('postId tidak ada di payload website.');\nif (scenes.length === 0) throw new Error('Payload tidak berisi scenes. Kirim ulang dari Meja Victor.');\n\nconst clipsCallback = data.clips_callback_url\n  || String(data.callback_url || '').replace(/attach-video$/, 'attach-clips');\nif (!/^https?:\\/\\//.test(clipsCallback)) throw new Error('clips_callback_url tidak valid: ' + clipsCallback);\n\nreturn scenes\n  .filter(s => (s.ai_video_prompt_en || '').trim())\n  .map((s, i) => ({\n    json: {\n      postId: data.postId,\n      scene_number: Number(s.scene_number) || i + 1,\n      prompt: s.ai_video_prompt_en.trim(),\n      overlay_text: s.overlay_text || '',\n      fal_model: data.fal_model || 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',\n      clip_duration: String(data.clip_duration || '5'),\n      clips_callback_url: clipsCallback,\n      access_code: data.access_code || ''\n    }\n  }));"
       },
       "id": "c3d4e5f6-a1b2-4c3d-8e4f-334455667788",
       "name": "Parse Naskah & 5-Scene Prompts",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        380,
-        500
-      ]
-    },
-    {
-      "parameters": {
-        "content": "## 🎥 PABRIK RENDER VIDEO AI (KLING AI / RUNWAY / FAL.AI)\n\nNode di bawah mengeksekusi render video AI:\n1. Tiap scene prompt diteruskan ke AI Video generator.\n2. Video MP4 vertikal 9:16 yang sudah selesai di-render dikemas menjadi URL publik.\n3. Default workflow sudah menyertakan video output test MP4 dinamis agar Bos Ridho bisa langsung klik Test Workflow dan melihat hasilnya di Meja Agnes!",
-        "height": 220,
-        "width": 520
-      },
-      "id": "d4e5f6a1-b2c3-4d4e-9f5a-445566778899",
-      "name": "💡 PETUNJUK ENGINE AI",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        680,
-        220
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const item = $input.first().json;\n\n// URL Video jadi hasil AI Generator (Kling AI / Runway / Fal.ai / Creatomate)\n// Jika dihubungkan ke API Kling AI / Runway, arahkan output ke video_url di sini.\nconst finalVideoUrl = item.custom_rendered_video_url || \"/videos/post-1795490268558.mp4\";\n\nreturn [{\n  json: {\n    ...item,\n    video_url: finalVideoUrl,\n    render_engine: \"AI Video Generator (Kling AI / Runway 5-Scene Pipeline)\",\n    rendered_at: new Date().toISOString()\n  }\n}];"
-      },
-      "id": "e5f6a1b2-c3d4-4e5f-a6b7-556677889900",
-      "name": "Generate AI Video (Kling AI / Pipeline)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        700,
-        500
-      ]
+      "position": [240, 520]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $json.callback_url }}",
+        "url": "=https://queue.fal.run/{{ $json.fal_model }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: $json.prompt, duration: $json.clip_duration, aspect_ratio: '9:16', negative_prompt: 'blur, distortion, low quality, text, watermark, logo' }) }}",
+        "options": {}
+      },
+      "id": "e5f6a1b2-c3d4-4e5f-a6b7-556677889900",
+      "name": "Fal.ai - Kirim Render (Kling)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 520],
+      "credentials": {
+        "httpHeaderAuth": { "id": "fal-api-key", "name": "Fal.ai API Key" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gabungkan data scene dengan request_id antrian Fal.ai\nconst scenes = $('Parse Naskah & 5-Scene Prompts').all();\nreturn $input.all().map((it, i) => ({\n  json: {\n    ...scenes[i].json,\n    request_id: it.json.request_id,\n    status_url: it.json.status_url,\n    response_url: it.json.response_url,\n    attempt: 0\n  }\n}));"
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c01",
+      "name": "Simpan Antrian Render",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 520]
+    },
+    {
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d12",
+      "name": "Tunggu 60 Detik",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [960, 520],
+      "webhookId": "kantor-ai-video-wait"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.status_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e23",
+      "name": "Fal.ai - Cek Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 520],
+      "credentials": {
+        "httpHeaderAuth": { "id": "fal-api-key", "name": "Fal.ai API Key" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Cek apakah ke-5 klip sudah selesai. Semua item lewat bersamaan → mudah digabung.\nconst MAX_ATTEMPT = 20; // 20 x 60 detik = 20 menit\nconst prev = $('Tunggu 60 Detik').all();\nconst items = $input.all().map((it, i) => ({\n  ...prev[i].json,\n  fal_status: it.json.status,\n  attempt: (prev[i].json.attempt || 0) + 1\n}));\nconst allDone = items.every(x => x.fal_status === 'COMPLETED');\nconst timedOut = !allDone && items[0].attempt >= MAX_ATTEMPT;\nreturn items.map(x => ({ json: { ...x, all_done: allDone, timed_out: timedOut } }));"
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-9f7a-8b9c0d1e2f34",
+      "name": "Evaluasi Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 520]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "f1a2b3c4-0001-4000-8000-000000000001",
+              "leftValue": "={{ $json.all_done }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a45",
+      "name": "Semua Klip Selesai?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1680, 520]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "f1a2b3c4-0002-4000-8000-000000000002",
+              "leftValue": "={{ $json.timed_out }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b56",
+      "name": "Timeout?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1920, 720]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=Render Fal.ai belum selesai setelah 20 menit (Post #{{ $json.postId }}). Status: {{ $input.all().map(i => i.json.fal_status).join(', ') }}"
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-8c0d-2e3f4a5b6c67",
+      "name": "Stop: Render Timeout",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [2160, 640]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.response_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-9d1e-3f4a5b6c7d78",
+      "name": "Fal.ai - Ambil Hasil Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 420],
+      "credentials": {
+        "httpHeaderAuth": { "id": "fal-api-key", "name": "Fal.ai API Key" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Susun 5 URL klip (urut scene) untuk dikirim ke website\nconst meta = $('Evaluasi Status').all();\nconst clips = $input.all().map((it, i) => ({\n  scene_number: meta[i].json.scene_number,\n  url: it.json.video?.url || it.json.video_url || ''\n}));\nconst missing = clips.filter(c => !c.url);\nif (missing.length) throw new Error('Fal.ai tidak mengembalikan URL video untuk scene: ' + missing.map(c => c.scene_number).join(', '));\nconst first = meta[0].json;\nreturn [{ json: { postId: first.postId, clips, clips_callback_url: first.clips_callback_url, access_code: first.access_code } }];"
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-8e2f-4a5b6c7d8e89",
+      "name": "Susun Daftar Klip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.clips_callback_url }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-access-code",
-              "value": "={{ $json.access_code }}"
-            }
+            { "name": "x-access-code", "value": "={{ $json.access_code }}" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"postId\": {{ $json.postId }},\n  \"videoUrl\": \"{{ $json.video_url }}\",\n  \"renderTime\": \"Rendered via n8n AI Video (5 Scene Naskah Victor)\"\n}",
+        "jsonBody": "={{ JSON.stringify({ postId: $json.postId, clips: $json.clips }) }}",
         "options": {}
       },
       "id": "f6a1b2c3-d4e5-4f6a-b7c8-667788990011",
-      "name": "Callback ke Meja Review Agnes",
+      "name": "Kirim Klip ke Website (Meja Agnes)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1000,
-        500
-      ]
+      "position": [2400, 420]
     },
     {
       "parameters": {
-        "content": "## 🛡️ REVIEW GATE (MEJA REVIEW AGNES)\n\nSetelah node ini terpanggil:\n1. Video otomatis muncul di **Meja Review Agnes** di website kantor 3D.\n2. Bos Ridho dan Agnes bisa memutar video langsung di browser.\n3. Jika video sudah sesuai brief dan naskah, klik **APPROVE & PUBLISH** untuk memposting ke Facebook/Instagram!",
+        "content": "## 🛡️ REVIEW GATE (MEJA REVIEW AGNES)\n\n1. Website menggabungkan 5 klip + voiceover + teks → video muncul otomatis di **Meja Review Agnes**.\n2. Bos Ridho & Agnes menonton di browser.\n3. Klik **APPROVE & PUBLISH** → website memanggil workflow **Publish FB & IG**.",
         "height": 220,
-        "width": 380
+        "width": 420
       },
       "id": "a2b3c4d5-e6f7-4a8b-9c0d-778899001122",
       "name": "🛡️ REVIEW GATE",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [
-        1240,
-        420
-      ]
+      "position": [2340, 140]
     }
   ],
   "pinData": {},
   "connections": {
     "Webhook Meja Victor": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Parse Naskah & 5-Scene Prompts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[
+        { "node": "Respond to Webhook", "type": "main", "index": 0 },
+        { "node": "Parse Naskah & 5-Scene Prompts", "type": "main", "index": 0 }
+      ]]
     },
     "Parse Naskah & 5-Scene Prompts": {
+      "main": [[{ "node": "Fal.ai - Kirim Render (Kling)", "type": "main", "index": 0 }]]
+    },
+    "Fal.ai - Kirim Render (Kling)": {
+      "main": [[{ "node": "Simpan Antrian Render", "type": "main", "index": 0 }]]
+    },
+    "Simpan Antrian Render": {
+      "main": [[{ "node": "Tunggu 60 Detik", "type": "main", "index": 0 }]]
+    },
+    "Tunggu 60 Detik": {
+      "main": [[{ "node": "Fal.ai - Cek Status", "type": "main", "index": 0 }]]
+    },
+    "Fal.ai - Cek Status": {
+      "main": [[{ "node": "Evaluasi Status", "type": "main", "index": 0 }]]
+    },
+    "Evaluasi Status": {
+      "main": [[{ "node": "Semua Klip Selesai?", "type": "main", "index": 0 }]]
+    },
+    "Semua Klip Selesai?": {
       "main": [
-        [
-          {
-            "node": "Generate AI Video (Kling AI / Pipeline)",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Fal.ai - Ambil Hasil Video", "type": "main", "index": 0 }],
+        [{ "node": "Timeout?", "type": "main", "index": 0 }]
       ]
     },
-    "Generate AI Video (Kling AI / Pipeline)": {
+    "Timeout?": {
       "main": [
-        [
-          {
-            "node": "Callback ke Meja Review Agnes",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Stop: Render Timeout", "type": "main", "index": 0 }],
+        [{ "node": "Tunggu 60 Detik", "type": "main", "index": 0 }]
       ]
+    },
+    "Fal.ai - Ambil Hasil Video": {
+      "main": [[{ "node": "Susun Daftar Klip", "type": "main", "index": 0 }]]
+    },
+    "Susun Daftar Klip": {
+      "main": [[{ "node": "Kirim Klip ke Website (Meja Agnes)", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "versionId": "1a2b3c4d-5e6f-7a8b-9c0d-video-v1",
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
+  "settings": { "executionOrder": "v1" },
+  "versionId": "1a2b3c4d-5e6f-7a8b-9c0d-video-v2-fal",
+  "meta": { "templateCredsSetupCompleted": false },
   "id": "kantor-ai-video-pipeline",
-  "tags": [
-    {
-      "name": "Kantor AI Video",
-      "id": "kantor-ai-video-tag"
-    }
-  ]
+  "tags": [{ "name": "Kantor AI Video", "id": "kantor-ai-video-tag" }]
 }

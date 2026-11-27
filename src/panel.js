@@ -272,6 +272,12 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           <audio controls src="/api/ugc/download-audio?stream=1" style="width:100%;height:28px;outline:none;"></audio>
         </div>
 
+        <!-- Unggah Video Hasil AI Pembuat Konten (alur utama) -->
+        <div style="margin-bottom:10px;padding:10px;background:#eff6ff;border:1.5px dashed #60a5fa;border-radius:10px;">
+          <div style="font-size:11.5px;font-weight:700;color:#1e40af;margin-bottom:6px;">📤 Punya video dari AI pembuat konten? Unggah MP4 di sini untuk di-review, lalu APPROVE agar n8n otomatis posting.</div>
+          <button type="button" id="btn-upload-main" style="width:100%;padding:9px 12px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">📤 Unggah Video MP4</button>
+        </div>
+
         <!-- Opsi Render Tambahan -->
         <div style="margin-bottom:10px;">
           <button type="button" id="btn-render-video" style="width:100%;padding:9px 12px;background:#475569;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:11.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 4px rgba(71,85,105,0.2);">
@@ -399,7 +405,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
               if (videoErrorPlaceholder) videoErrorPlaceholder.style.display = 'none';
               videoPlayer.src = data.videoUrl + '?t=' + Date.now();
               videoPlayer.load();
-              videoPlayer.play().catch(() => {});
+              videoPlayer.play().catch(() => { });
             }
           } else {
             btn.disabled = false;
@@ -433,7 +439,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
               const videoPlayer = card.querySelector('#review-video-player');
               if (videoPlayer) {
                 videoPlayer.src = data.videoUrl + '?t=' + Date.now();
-                videoPlayer.play().catch(() => {});
+                videoPlayer.play().catch(() => { });
               }
               alert('✅ Video AI UGC berhasil dipasang ke Meja Agnes!');
             }
@@ -442,6 +448,10 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           }
         };
         reader.readAsDataURL(file);
+      });
+
+      card.querySelector('#btn-upload-main')?.addEventListener('click', () => {
+        card.querySelector('#input-upload-ugc')?.click();
       });
 
       card.querySelector('#btn-close-review-card')?.addEventListener('click', () => {
@@ -455,7 +465,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           navigator.clipboard.writeText(textToCopy).then(() => {
             btn.textContent = '✅ Tersalin!';
             setTimeout(() => { btn.textContent = '📋 Salin Naskah'; }, 2000);
-          }).catch(() => {});
+          }).catch(() => { });
         }
       });
 
@@ -471,8 +481,9 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           });
           const res = await r.json();
           if (res.success) {
-            btn.textContent = '✅ BERHASIL DI-APPROVE!';
+            btn.textContent = res.publish?.sent ? '✅ APPROVED · Sedang diposting n8n...' : '✅ BERHASIL DI-APPROVE!';
             btn.style.background = '#059669';
+            if (res.publish && !res.publish.sent) alert(res.message);
             const b = card.querySelector('.badge');
             if (b) {
               b.className = 'badge badge-approved';
@@ -539,7 +550,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           const d = await res.json();
           if (d.posts?.[0]?.id) postId = d.posts[0].id;
         }
-      } catch {}
+      } catch { }
 
       const card = document.createElement('div');
       card.className = 'victor-video-card';
@@ -553,16 +564,13 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
           <span style="font-size:10.5px;background:#dcfce7;color:#166534;padding:3px 8px;border-radius:99px;font-weight:700;">Naskah 5-Scene Terverifikasi</span>
         </div>
         <p style="font-size:11.5px;color:#334155;margin:0 0 10px 0;line-height:1.45;">
-          Naskah 5-scene dan prompt video AI di atas siap dieksekusi oleh <b>n8n (Kling AI / Runway)</b> untuk menghasilkan video gerak nyata (adegan semprot air badai, night to day, dan heatsink). Hasil video jadi akan otomatis masuk ke <b>Meja Review Agnes</b> untuk di-review sebelum diposting.
+          <b>Alur:</b> (1) Salin paket konten di bawah ➔ (2) tempel ke AI pembuat video pilihan Bos Ridho ➔ (3) unggah MP4 hasilnya di <b>Meja Agnes</b> ➔ (4) klik <b>APPROVE &amp; PUBLISH</b>, n8n yang otomatis posting ke Facebook/Instagram.
         </p>
 
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-          <button type="button" id="btn-victor-send-n8n" style="flex:2;min-width:180px;padding:10px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(37,99,235,0.3);">
-            🚀 Kirim Naskah & 5-Scene Prompt ke n8n
+          <button type="button" id="btn-victor-copy-pack" style="flex:2;min-width:180px;padding:10px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(37,99,235,0.3);">
+            📋 Salin Paket Konten (Naskah + Prompt Scene)
           </button>
-          <a href="/api/pipeline/n8n-workflow" download="kantor_ai_video_pipeline.json" id="btn-victor-dl-workflow" style="flex:1;min-width:130px;padding:10px 12px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 2px 6px rgba(5,150,105,0.25);">
-            📥 Unduh Workflow n8n
-          </a>
           <button type="button" id="btn-victor-copy-payload" style="padding:10px 12px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap;">
             📋 Salin JSON
           </button>
@@ -643,6 +651,31 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         }
       });
 
+      const btnCopyPack = card.querySelector('#btn-victor-copy-pack');
+      btnCopyPack?.addEventListener('click', async () => {
+        const label = btnCopyPack.innerHTML;
+        try {
+          const res = await fetch('/api/pipeline/send-to-n8n', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-access-code': getCode() },
+            body: JSON.stringify({ postId, copyOnly: true }),
+          });
+          const d = await res.json();
+          const p = d.payload;
+          if (!p) throw new Error(d.error || 'payload kosong');
+          cachedPayload = p;
+          const scenes = (p.scenes || []).map((s) =>
+            `SCENE ${s.scene_number} (${s.time_seconds}) - ${s.scene_title}\nVisual: ${s.action_id}\nPrompt AI Video (EN): ${s.ai_video_prompt_en}\nTeks Overlay: ${s.overlay_text}\nVoiceover: ${s.voiceover_line}`
+          ).join('\n\n');
+          const text = `PAKET KONTEN VIDEO - ${p.product_name}\nPlatform: ${p.target_platform} | Durasi: ${p.total_duration_seconds} detik\nHook: ${p.hook}\n\n=== 5 SCENE ===\n${scenes}\n\n=== NASKAH VOICEOVER LENGKAP ===\n${p.full_voiceover_script}\n\n=== CAPTION / AD COPY ===\n${p.facebook_ad_copy}`;
+          await navigator.clipboard.writeText(text);
+          btnCopyPack.innerText = '✅ Paket Tersalin! Tempel ke AI Video';
+        } catch (e) {
+          btnCopyPack.innerText = '❌ Gagal Salin: ' + e.message;
+        }
+        setTimeout(() => { btnCopyPack.innerHTML = label; }, 2500);
+      });
+
       btnCopyPayload?.addEventListener('click', async () => {
         try {
           if (!cachedPayload) {
@@ -697,7 +730,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
               previewWrap.style.display = 'block';
               player.src = d.videoUrl + '?t=' + Date.now();
               player.load();
-              player.play().catch(() => {});
+              player.play().catch(() => { });
             }
           } else {
             btn.disabled = false;
@@ -865,7 +898,7 @@ export function createPanel({ onSelect, onClose, onStatus, onNeedCode, isDemo })
         if (errPlaceholder) errPlaceholder.style.display = 'none';
         videoPlayer.src = videoUrl + '?t=' + Date.now();
         videoPlayer.load();
-        videoPlayer.play().catch(() => {});
+        videoPlayer.play().catch(() => { });
       } else {
         // Full card reload sebagai fallback
         loadAgnesReviewCard();

@@ -481,6 +481,29 @@ $('gate-form').addEventListener('submit', async (e) => {
           }
         }
 
+        // 🎞️ Status pipeline n8n: klip sedang digabung / gagal / sudah diposting ke FB-IG
+        if (['video_assembling', 'video_render_failed', 'post_published'].includes(data.type)) {
+          const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+          const info = {
+            video_assembling: ['⏳', '#38bdf8', 'Klip AI dari n8n diterima', `Post #${esc(data.postId)} — menggabungkan ${esc(data.clips)} klip + voiceover...`],
+            video_render_failed: ['⚠️', '#f87171', 'Gagal menggabungkan video', `Post #${esc(data.postId)} — ${esc(data.error)}`],
+            post_published: data.status === 'PUBLISHED'
+              ? ['📣', '#4ade80', 'Konten sudah tayang di Facebook/Instagram', `Post #${esc(data.postId)}${data.error ? ` — sebagian gagal: ${esc(data.error)}` : ''}`]
+              : ['⚠️', '#f87171', 'Posting ke Facebook/Instagram gagal', `Post #${esc(data.postId)} — ${esc(data.error)}`],
+          }[data.type];
+          const banner = $('banner');
+          banner.hidden = false;
+          banner.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:22px;">${info[0]}</span>
+                <div><strong style="color:${info[1]};">${info[2]}</strong><br><span style="font-size:12px;color:#cbd5e1;">${info[3]}</span></div>
+              </div>
+              <button id="btn-close-banner-pipeline" type="button" style="background:transparent;color:#94a3b8;border:none;font-size:18px;cursor:pointer;padding:4px 8px;">✕</button>
+            </div>`;
+          $('btn-close-banner-pipeline')?.addEventListener('click', () => { banner.hidden = true; });
+        }
+
         if (data.type === 'sales_inquiry') {
           const sean = byId.get('sean');
           if (sean) {
